@@ -1,4 +1,0 @@
-rule_name,action,protocol,source,source_port,destination,dest_port,interface,vendor,acl_name
-WEB_ALLOW,permit,tcp,any,any,192.168.1.100,80,outside,cisco_asa,OUTSIDE_IN
-SSH_BLOCK,deny,tcp,any,any,any,22,inside,cisco_asa,INSIDE_OUT
-HTTPS_ALLOW,permit,tcp,10.0.0.0/24,any,192.168.1.100,443,outside,cisco_asa,OUTSIDE_IN

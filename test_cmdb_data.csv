@@ -1,6 +1,0 @@
-hostname,ip_address,os_type,location,department,owner,status,last_updated
-server01,192.168.1.100,Windows Server 2019,Data Center A,IT,John Doe,Active,2024-01-15
-workstation05,192.168.1.150,Windows 10,Office Floor 2,HR,Jane Smith,Active,2024-01-14
-router01,10.0.0.1,Cisco IOS,Network Closet,IT,Bob Johnson,Active,2024-01-13
-laptop20,192.168.1.200,macOS Monterey,Remote,Marketing,Alice Brown,Inactive,2024-01-12
-switch03,10.0.0.10,Juniper JunOS,Data Center B,IT,Charlie Wilson,Maintenance,2024-01-11

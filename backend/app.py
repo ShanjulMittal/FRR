@@ -23,6 +23,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+def _get_uploads_dir():
+    uploads_dir = os.getenv('UPLOADS_DIR')
+    if not uploads_dir:
+        uploads_dir = '/data/uploads' if os.path.isdir('/data') else os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
+    os.makedirs(uploads_dir, exist_ok=True)
+    return uploads_dir
+
+
 app = Flask(__name__)
 CORS(app)
 
@@ -2047,7 +2055,7 @@ def analyze_file():
                 is_text_cfg = True
         if is_text_cfg:
             try:
-                temp_fp = f"/Users/shanjulmittal/FRR/uploads/_analyze_{uuid.uuid4().hex}.txt"
+                temp_fp = os.path.join(_get_uploads_dir(), f"_analyze_{uuid.uuid4().hex}.txt")
                 with open(temp_fp, 'w', encoding='utf-8') as fh:
                     fh.write(text_content or '')
                 parsed = parser_factory.parse_file(temp_fp, 'firewall', vendor='auto')
@@ -2266,7 +2274,7 @@ def upload_file():
         # Handle text firewall configuration via parser
         if (file_type or '').lower() == 'firewall' and (name_lower.endswith('.txt') or name_lower.endswith('.conf') or ('access-list' in (text_content.lower() if text_content else ''))):
             try:
-                temp_fp = f"/Users/shanjulmittal/FRR/uploads/_incoming_{uuid.uuid4().hex}.txt"
+                temp_fp = os.path.join(_get_uploads_dir(), f"_incoming_{uuid.uuid4().hex}.txt")
                 with open(temp_fp, 'w', encoding='utf-8') as fh:
                     fh.write(text_content or '')
                 parsed = parser_factory.parse_file(temp_fp, 'firewall', vendor='auto')

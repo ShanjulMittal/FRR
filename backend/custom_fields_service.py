@@ -8,8 +8,16 @@ from typing import List, Dict, Any, Optional
 import os
 
 class CustomFieldsService:
-    def __init__(self, db_path: str = 'custom_fields.db'):
+    def __init__(self, db_path: str = None):
+        if not db_path:
+            base_dir = os.getenv('DATA_DIR')
+            if not base_dir:
+                base_dir = '/data' if os.path.isdir('/data') else os.path.dirname(os.path.abspath(__file__))
+            db_path = os.path.join(base_dir, 'custom_fields.db')
         self.db_path = db_path
+        db_dir = os.path.dirname(os.path.abspath(self.db_path))
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
         self.init_database()
     
     def init_database(self):

@@ -1,6 +1,0 @@
-Hostname,IP Address,Asset Type,Environment,Owner,Location,Description
-web01,10.1.1.1,Server,Production,AppTeam,Data Center A,Production web server
-web02,10.1.1.2,Server,Production,AppTeam,Data Center A,Secondary web server
-db01,10.1.2.1,Database,Production,DBTeam,Data Center B,Primary database server
-app01,192.168.1.10,Application,Production,DevTeam,Data Center A,Application server
-test01,192.168.2.10,Server,Development,QATeam,Data Center B,Testing server

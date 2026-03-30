@@ -1,6 +1,0 @@
-Source IP,Destination IP,Port,Protocol,Action,Rule Text,Line Number
-192.168.1.10,10.0.0.5,80,tcp,permit,"permit tcp host 192.168.1.10 host 10.0.0.5 eq 80",1
-192.168.1.0/24,10.0.0.10,443,tcp,permit,"permit tcp 192.168.1.0 255.255.255.0 host 10.0.0.10 eq 443",2
-any,192.168.100.5,22,tcp,deny,"deny tcp any host 192.168.100.5 eq 22",3
-172.16.0.0/16,any,53,udp,permit,"permit udp 172.16.0.0 255.255.0.0 any eq 53",4
-10.0.0.0/8,192.168.0.0/16,25,tcp,permit,"permit tcp 10.0.0.0 255.0.0.0 192.168.0.0 255.255.0.0 eq 25",5

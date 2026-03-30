@@ -1,5 +1,0 @@
-Source,Destination,Service,Action,Rule Name,Line,Type
-192.168.1.10,10.0.0.5,TCP/80,Allow,Web Access Rule,1,Firewall
-10.0.0.0/24,192.168.2.0/24,TCP/22,Deny,SSH Block Rule,2,Firewall
-any,192.168.1.100,UDP/53,Allow,DNS Rule,3,Firewall
-172.16.0.0/16,any,ICMP/0,Allow,Ping Rule,4,Firewall

@@ -9,3 +9,6 @@ backend/instance/
 backend/venv/
 frontend/node_modules/
 frontend/build/
+/deploy/
+/test-files/
+/uploads/
