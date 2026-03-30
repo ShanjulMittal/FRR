@@ -266,6 +266,55 @@ with app.app_context():
                 db.session.commit()
         except Exception as e:
             logger.warning(f"Default profile seed failed: {e}")
+        try:
+            if ServicePortMapping.query.count() == 0:
+                offline = str(os.getenv('OFFLINE_MODE', '')).strip().lower() in {'1', 'true', 'yes', 'on'}
+                auto_import = str(os.getenv('AUTO_IMPORT_IANA', 'true')).strip().lower() in {'1', 'true', 'yes', 'on'}
+                seeded = False
+                if auto_import and not offline:
+                    try:
+                        import_iana_service_mappings()
+                        seeded = True
+                    except Exception as ie:
+                        logger.warning(f"IANA service mapping import on startup failed: {ie}")
+                if not seeded:
+                    defaults = [
+                        ('http', 80, 'tcp', 'HTTP'),
+                        ('https', 443, 'tcp', 'HTTPS'),
+                        ('ssh', 22, 'tcp', 'SSH'),
+                        ('telnet', 23, 'tcp', 'Telnet'),
+                        ('smtp', 25, 'tcp', 'SMTP'),
+                        ('dns', 53, 'both', 'DNS'),
+                        ('dhcp-server', 67, 'udp', 'DHCP Server'),
+                        ('dhcp-client', 68, 'udp', 'DHCP Client'),
+                        ('ntp', 123, 'udp', 'NTP'),
+                        ('snmp', 161, 'udp', 'SNMP'),
+                        ('snmptrap', 162, 'udp', 'SNMP Trap'),
+                        ('ldap', 389, 'tcp', 'LDAP'),
+                        ('ldaps', 636, 'tcp', 'LDAPS'),
+                        ('smb', 445, 'tcp', 'SMB/CIFS'),
+                        ('rdp', 3389, 'tcp', 'Remote Desktop Protocol'),
+                        ('mysql', 3306, 'tcp', 'MySQL'),
+                        ('postgres', 5432, 'tcp', 'PostgreSQL'),
+                        ('mssql', 1433, 'tcp', 'Microsoft SQL Server'),
+                        ('redis', 6379, 'tcp', 'Redis'),
+                        ('kafka', 9092, 'tcp', 'Kafka'),
+                    ]
+                    objs = []
+                    for name, port, proto, desc in defaults:
+                        objs.append(ServicePortMapping(
+                            service_name=name,
+                            port_number=port,
+                            protocol=proto,
+                            description=desc,
+                            category='builtin',
+                            is_well_known=(port < 1024),
+                            is_active=True
+                        ))
+                    db.session.bulk_save_objects(objs)
+                    db.session.commit()
+        except Exception as e:
+            logger.warning(f"Service mapping seed failed: {e}")
     except Exception as e:
         logger.warning(f"Database init failed: {e}")
 
