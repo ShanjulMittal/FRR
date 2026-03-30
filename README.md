@@ -19,15 +19,14 @@ Open:
 
 ## Table of Contents
 
-- Features
-- Architecture
-- Prerequisites
-- Installation & Setup
-- Running the Application
-- Usage Examples
-- UI Pages (What You’ll See + How to Use)
-- Development
-- Troubleshooting
+- [Features](#-features)
+- [Architecture](#️-architecture)
+- [Prerequisites](#-prerequisites)
+- [Installation & Setup](#️-installation--setup)
+- [Running the Application](#-running-the-application)
+- [Usage Examples](#-usage-examples)
+- [Development](#-development)
+- [Troubleshooting](#-troubleshooting)
 
 ## 🚀 Features
 
@@ -53,7 +52,7 @@ Open:
 flowchart LR
   UI[Frontend (React + Nginx)] -->|/api/*| API[Backend (Flask)]
   API --> DB[(SQLite DB)]
-  API --> UP[(Uploads Folder)]
+  API --> UP[(Uploads Folder /data/uploads)]
   DB --> API
   UP --> API
 ```
@@ -74,20 +73,20 @@ flowchart TB
 
 ```mermaid
 erDiagram
-  RAW_FIREWALL_RULES ||--o{ NORMALIZED_RULES : normalizes_to
-  CMDB_ASSETS ||--o{ NORMALIZED_RULES : enriches
-  VLAN_NETWORKS ||--o{ NORMALIZED_RULES : enriches
-  SERVICE_PORT_MAPPINGS ||--o{ NORMALIZED_RULES : resolves
-  COMPLIANCE_RULES ||--o{ REVIEW_RESULTS : evaluates
-  REVIEW_PROFILES ||--o{ REVIEW_RESULTS : groups
-  NORMALIZED_RULES ||--o{ REVIEW_RESULTS : produces
+  raw_firewall_rules ||--o{ normalized_rules : normalizes_to
+  cmdb_assets ||--o{ normalized_rules : enriches
+  vlan_networks ||--o{ normalized_rules : enriches
+  service_port_mappings ||--o{ normalized_rules : resolves
+  compliance_rules ||--o{ review_results : evaluates
+  review_profiles ||--o{ review_results : groups
+  normalized_rules ||--o{ review_results : produces
 
-  RAW_FIREWALL_RULES {
+  raw_firewall_rules {
     int id
     string source_file
     string rule_text
   }
-  NORMALIZED_RULES {
+  normalized_rules {
     int id
     string source_file
     string action
@@ -96,36 +95,36 @@ erDiagram
     string dest_ip
     string dest_port
   }
-  CMDB_ASSETS {
+  cmdb_assets {
     int id
     string ip_address
     string hostname
     string owner
     string environment
   }
-  VLAN_NETWORKS {
+  vlan_networks {
     int id
     int vlan_id
     string subnet
     string name
   }
-  SERVICE_PORT_MAPPINGS {
+  service_port_mappings {
     int id
     string service_name
     int port_number
     string protocol
   }
-  COMPLIANCE_RULES {
+  compliance_rules {
     int id
     string rule_name
     string severity
   }
-  REVIEW_PROFILES {
+  review_profiles {
     int id
     string profile_name
     string compliance_framework
   }
-  REVIEW_RESULTS {
+  review_results {
     int id
     string status
     string severity
@@ -157,14 +156,14 @@ FRR/
 
 - Docker Desktop (Windows/macOS) or Docker Engine (Linux)
 - Docker Compose V2
-- (Local dev only) Python 3.8+ and Node.js 16+
+- (Local dev only) Python 3.11+ and Node.js 18+
 
 ## 🛠️ Installation & Setup
 
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/ShanjulMittal/FRR.git
 cd FRR
 ```
 
