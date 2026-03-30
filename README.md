@@ -2,6 +2,33 @@
 
 A comprehensive web application for reviewing, analyzing, and managing firewall rules with CMDB integration and compliance reporting.
 
+![build-and-publish-images](https://github.com/ShanjulMittal/FRR/actions/workflows/docker-publish.yml/badge.svg)
+
+## Quick Start (Docker)
+
+```bash
+git clone https://github.com/ShanjulMittal/FRR.git
+cd FRR
+docker compose up -d --build
+```
+
+Open:
+- UI: `http://localhost:8080/`
+- API: `http://localhost:5001/`
+- Health: `http://localhost:5001/health`
+
+## Table of Contents
+
+- Features
+- Architecture
+- Prerequisites
+- Installation & Setup
+- Running the Application
+- Usage Examples
+- UI Pages (What You’ll See + How to Use)
+- Development
+- Troubleshooting
+
 ## 🚀 Features
 
 - **Firewall Rule Management**: Parse and analyze firewall configurations from various formats
@@ -19,6 +46,91 @@ A comprehensive web application for reviewing, analyzing, and managing firewall 
 - **Database**: SQLite (default) via SQLAlchemy
 - **Frontend**: React with TypeScript and Material-UI
 - **Data Processing**: Pandas for data manipulation and parsing
+
+### Architecture Diagram
+
+```mermaid
+flowchart LR
+  UI[Frontend (React + Nginx)] -->|/api/*| API[Backend (Flask)]
+  API --> DB[(SQLite DB)]
+  API --> UP[(Uploads Folder)]
+  DB --> API
+  UP --> API
+```
+
+### Data Flow (Typical Ingestion)
+
+```mermaid
+flowchart TB
+  U[User Uploads Files] --> P[Parser detects format/vendor]
+  P --> R[Raw Rules / Raw Records Stored]
+  R --> N[Normalization (one rule = one flow)]
+  N --> E[Enrichment (CMDB + VLAN + Service Mapping)]
+  E --> C[Compliance Evaluation (Profiles + Rules)]
+  C --> D[Dashboard + Review Results + Exports]
+```
+
+### Data Model (At a Glance)
+
+```mermaid
+erDiagram
+  RAW_FIREWALL_RULES ||--o{ NORMALIZED_RULES : normalizes_to
+  CMDB_ASSETS ||--o{ NORMALIZED_RULES : enriches
+  VLAN_NETWORKS ||--o{ NORMALIZED_RULES : enriches
+  SERVICE_PORT_MAPPINGS ||--o{ NORMALIZED_RULES : resolves
+  COMPLIANCE_RULES ||--o{ REVIEW_RESULTS : evaluates
+  REVIEW_PROFILES ||--o{ REVIEW_RESULTS : groups
+  NORMALIZED_RULES ||--o{ REVIEW_RESULTS : produces
+
+  RAW_FIREWALL_RULES {
+    int id
+    string source_file
+    string rule_text
+  }
+  NORMALIZED_RULES {
+    int id
+    string source_file
+    string action
+    string protocol
+    string source_ip
+    string dest_ip
+    string dest_port
+  }
+  CMDB_ASSETS {
+    int id
+    string ip_address
+    string hostname
+    string owner
+    string environment
+  }
+  VLAN_NETWORKS {
+    int id
+    int vlan_id
+    string subnet
+    string name
+  }
+  SERVICE_PORT_MAPPINGS {
+    int id
+    string service_name
+    int port_number
+    string protocol
+  }
+  COMPLIANCE_RULES {
+    int id
+    string rule_name
+    string severity
+  }
+  REVIEW_PROFILES {
+    int id
+    string profile_name
+    string compliance_framework
+  }
+  REVIEW_RESULTS {
+    int id
+    string status
+    string severity
+  }
+```
 
 ### Project Structure
 
@@ -246,19 +358,21 @@ The dashboard provides:
 
 ### UI Pages (What You’ll See + How to Use)
 
-- **Dashboard**: High-level counts and status. Use this first to confirm uploads/normalization changed the totals as expected.
-- **Uploads**: The main ingestion step. Upload Firewall/CMDB/VLAN files, use the column-mapping dialog when needed, then go to the relevant pages below to validate the imported data.
-- **Rules**: Raw parsed firewall rule lines. Use this to spot parsing issues early (missing fields, unexpected actions/services, wrong zones).
-- **Normalized Rules**: Normalized “one rule = one flow” view used for compliance. Filter by Source File and click “Normalize Selected Source” after uploads (especially Cisco ASA). Re-normalize after re-uploading the same ASA file.
-- **CMDB**: Asset inventory (IP/hostname/owner/environment/category). Upload CMDB before running compliance so rules can be enriched with business context.
-- **VLANs**: VLAN/subnet mapping used to enrich rules with VLAN context. Upload VLAN data if you want source/destination VLAN columns populated.
-- **Object Groups**: Discovered/imported object groups and their members. Use “Scan for Groups” after uploading firewall configs to populate groups (useful for ASA-style object-group rules).
-- **Service Mappings**: Port↔service catalog (used during normalization and display). Import from IANA if you want a fuller mapping set; the app auto-seeds a baseline on first run.
-- **Compliance Rules**: View/manage the compliance checks that are applied to normalized rules.
-- **Review Profiles**: Group compliance rules into templates you can run together (e.g., PCI baseline). Use profiles to standardize review runs across files.
-- **Compliance Dashboard**: Summary metrics and charts of compliance outcomes (requires normalized rules, and is better with CMDB/VLAN enrichment).
-- **Review Results**: Detailed per-run/per-rule findings and drilldowns to the underlying normalized rules.
-- **Custom Fields**: Define additional fields extracted from uploads and used in rules/reports (e.g., “rule_name”).
+| Page | Primary Data | What to Do Here | Tips |
+| --- | --- | --- | --- |
+| Dashboard | Rollups and status indicators | Confirm data exists after uploads and normalization | Use this as a quick sanity check before deeper review |
+| Uploads | File ingestion (Firewall / CMDB / VLAN) | Upload files and map columns when prompted | Upload CMDB + VLAN before compliance for richer context |
+| Rules | Raw parsed rule lines | Spot parsing issues (missing fields, unexpected actions/services) | If raw parsing looks wrong, fix the source file or parser before normalizing |
+| Normalized Rules | Normalized “one rule = one flow” | Filter by Source File; normalize/re-normalize; export; bulk cleanup | For Cisco ASA: normalize after upload; re-normalize whenever you re-upload the same file |
+| CMDB | Assets (IP/hostname/owner/environment/category) | Validate asset coverage and enrich rule context | Missing CMDB entries reduce compliance/business-context accuracy |
+| VLANs | VLAN-to-subnet mapping | Populate VLAN context for source/destination | Helps segment environments and improves future topology mapping |
+| Object Groups | Groups + members discovered/imported | Scan/import groups; inspect membership; delete stale groups | Useful for ASA object-group-heavy configs |
+| Service Mappings | Port↔service name catalog | Import IANA mappings; edit service labels | Better mappings improve service visibility in normalized rules |
+| Compliance Rules | Atomic checks (operators, logic, severity) | Review/adjust rule definitions and severities | Keep rules small and composable; use profiles to group them |
+| Review Profiles | Sets of compliance rules | Build templates (e.g., PCI baseline) | Use profiles to standardize reviews across teams/files |
+| Compliance Dashboard | Compliance metrics and charts | Track compliance posture and trends | Strongly depends on normalized + enriched data |
+| Review Results | Findings per review run | Drill down into failing rules and evidence | Use export + filters to share results with stakeholders |
+| Custom Fields | Field definitions extracted/stored | Extend what metadata is captured and evaluated | Useful for rule naming, ownership, change references, etc. |
 
 ## 🔍 Development
 
