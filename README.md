@@ -373,6 +373,17 @@ The dashboard provides:
 | Review Results | Findings per review run | Drill down into failing rules and evidence | Use export + filters to share results with stakeholders |
 | Custom Fields | Field definitions extracted/stored | Extend what metadata is captured and evaluated | Useful for rule naming, ownership, change references, etc. |
 
+### Application Screenshots
+
+Add screenshots under `assets/screenshots/` (PNG recommended) and reference them from the README using these filenames:
+
+| Screenshot | File to add |
+| --- | --- |
+| Dashboard overview | `assets/screenshots/dashboard.png` |
+| Uploads page (file ingest) | `assets/screenshots/uploads.png` |
+| Normalized Rules (filter + normalize) | `assets/screenshots/normalized-rules.png` |
+| Review Results (findings drilldown) | `assets/screenshots/review-results.png` |
+
 ## 🔍 Development
 
 ### Roadmap (Upcoming Features)
