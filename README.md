@@ -27,10 +27,9 @@ FRR/
 ├── backend/
 │   ├── app.py              # Main Flask application
 │   ├── models.py           # Database models
-│   ├── parsers.py          # File parsing utilities
+│   ├── parsers/            # File parsing utilities
 │   ├── requirements.txt    # Python dependencies
 │   ├── .env.example        # Environment configuration template
-│   └── uploads/            # File upload directory
 ├── frontend/
 │   ├── src/
 │   │   ├── components/     # Reusable React components
@@ -93,11 +92,9 @@ FLASK_ENV=development
 FLASK_DEBUG=True
 ```
 
-#### Setup Database
+#### Database
 
-1. Create a PostgreSQL database named `firewall_review`
-2. Update the `DATABASE_URL` in your `.env` file
-3. The application will automatically create tables on first run
+The application uses SQLite by default and will automatically create tables on first run.
 
 ### 3. Frontend Setup
 
@@ -148,6 +145,7 @@ docker compose down
 Notes:
 - Docker UI runs on port `8080` (Nginx). Port `3000` is only for the local React dev server.
 - The backend uses SQLite by default and persists the DB in the Docker volume (`frr-backend-data`).
+- Uploads are stored under `/data/uploads` in Docker (or `backend/uploads` when running locally).
 
 ### Multi-Arch Images (Publish to Docker Hub / GHCR)
 
@@ -230,6 +228,7 @@ The React application will be available at `http://localhost:3000`
 2. Select "Firewall Configuration" as file type
 3. Drag and drop or select your configuration file
 4. The system will parse and store the rules automatically
+5. For Cisco ASA uploads, go to "Normalized Rules", select the uploaded Source File, then click "Normalize Selected Source" (re-normalize whenever you re-upload the same file)
 
 ### Viewing Dashboard
 
@@ -249,7 +248,7 @@ The dashboard provides:
 
 ### Adding New Parsers
 
-1. Create a new parser class in `backend/parsers.py`
+1. Create a new parser class in `backend/parsers/`
 2. Implement the required parsing methods
 3. Update the upload endpoint to handle the new format
 
@@ -264,9 +263,9 @@ The dashboard provides:
 ### Common Issues
 
 1. **Database Connection Error**
-   - Verify PostgreSQL is running
-   - Check DATABASE_URL in .env file
-   - Ensure database exists and credentials are correct
+   - Check DATABASE_URL in `.env` (SQLite is the default)
+   - For Docker, confirm the backend container is healthy and the volume `frr-backend-data` is created
+   - If you configured an external database, ensure it is reachable from the backend
 
 2. **CORS Issues**
    - Verify REACT_APP_API_URL in frontend .env
@@ -281,7 +280,7 @@ The dashboard provides:
 
 - Backend logs: Check Flask console output
 - Frontend logs: Open browser developer tools
-- Database logs: Check PostgreSQL logs for connection issues
+- Database errors: Check backend logs for SQL/connection errors
 
 ## 🤝 Contributing
 

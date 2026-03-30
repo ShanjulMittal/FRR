@@ -2,6 +2,7 @@ import logging
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from sqlalchemy import or_, and_, text
+from sqlalchemy.exc import OperationalError
 import json
 import csv
 import io
@@ -46,7 +47,13 @@ db.init_app(app)
 
 with app.app_context():
     try:
-        db.create_all()
+        try:
+            db.create_all()
+        except OperationalError as oe:
+            if 'already exists' in str(oe).lower():
+                db.session.rollback()
+            else:
+                raise
         cols = db.session.execute(text("PRAGMA table_info(compliance_rules)")).fetchall()
         col_names = {row[1] for row in cols}
         if 'logic' not in col_names:
@@ -63,15 +70,32 @@ with app.app_context():
                 {'field_name':'pcidss_asset_category','display_name':'PCI DSS Category','description':'PCI DSS asset category','field_type':'text','file_type':'cmdb','is_mandatory':False,'is_important':False,'default_value':'','validation_rules':'','is_active':True,'created_by':'system'},
                 {'field_name':'environment','display_name':'Environment','description':'Environment','field_type':'text','file_type':'cmdb','is_mandatory':False,'is_important':False,'default_value':'','validation_rules':'','is_active':True,'created_by':'system'}
             ]
-            for d in defaults:
+            dialect = db.engine.dialect.name
+            if dialect == 'sqlite':
+                now = datetime.utcnow().isoformat(sep=' ', timespec='seconds')
+                sql = text("""
+                    INSERT OR IGNORE INTO custom_fields
+                    (field_name, display_name, description, field_type, file_type, is_mandatory, is_important, default_value, validation_rules, is_active, created_by, created_at, updated_at)
+                    VALUES
+                    (:field_name, :display_name, :description, :field_type, :file_type, :is_mandatory, :is_important, :default_value, :validation_rules, :is_active, :created_by, :created_at, :updated_at)
+                """)
+                for d in defaults:
+                    params = dict(d)
+                    params['created_at'] = now
+                    params['updated_at'] = now
+                    db.session.execute(sql, params)
+                db.session.commit()
+            else:
                 from sqlalchemy import select
-                exists = db.session.execute(select(CustomFieldModel).where(CustomFieldModel.field_name == d['field_name'])).first()
-                if not exists:
-                    f = CustomFieldModel(**d)
-                    db.session.add(f)
-            db.session.commit()
+                with db.session.no_autoflush:
+                    for d in defaults:
+                        exists = db.session.execute(select(CustomFieldModel).where(CustomFieldModel.field_name == d['field_name'])).first()
+                        if not exists:
+                            db.session.add(CustomFieldModel(**d))
+                db.session.commit()
         except Exception as se:
             logger.warning(f"Custom fields seed failed: {se}")
+            db.session.rollback()
         try:
             existing = ComplianceRule.query.filter(ComplianceRule.rule_name == 'PCIDSS zone violation').first()
             if not existing:
@@ -96,6 +120,7 @@ with app.app_context():
                 db.session.commit()
         except Exception as e:
             logger.warning(f"PCIDSS zone violation seed failed: {e}")
+            db.session.rollback()
         try:
             existing = ComplianceRule.query.filter(ComplianceRule.rule_name == 'Business Documentation - Change reference').first()
             
@@ -251,21 +276,61 @@ with app.app_context():
         except Exception as e:
             logger.warning(f"Schema check failed for normalized_rules: {e}")
         try:
-            if ReviewProfile.query.count() == 0:
-                pci = ReviewProfile(profile_name='PCI DSS 4.0.1 Template', compliance_framework='PCI-DSS', version='4.0.1', is_active=True, created_by='system')
-                iso = ReviewProfile(profile_name='ISO 27001 Baseline', compliance_framework='ISO27001', version='2013', is_active=True, created_by='system')
-                db.session.add(pci)
-                db.session.add(iso)
+            dialect = db.engine.dialect.name
+            profiles_to_seed = [
+                ('PCI DSS 4.0.1 Template', 'PCI-DSS', '4.0.1'),
+                ('ISO 27001 Baseline', 'ISO27001', '2013'),
+            ]
+            if dialect == 'sqlite':
+                now = datetime.utcnow().isoformat(sep=' ', timespec='seconds')
+                insert_profile = text("""
+                    INSERT OR IGNORE INTO review_profiles
+                    (profile_name, description, compliance_framework, version, is_active, created_by, created_at, updated_at)
+                    VALUES
+                    (:profile_name, :description, :compliance_framework, :version, :is_active, :created_by, :created_at, :updated_at)
+                """)
+                for name, framework, version in profiles_to_seed:
+                    db.session.execute(insert_profile, {
+                        'profile_name': name,
+                        'description': None,
+                        'compliance_framework': framework,
+                        'version': version,
+                        'is_active': True,
+                        'created_by': 'system',
+                        'created_at': now,
+                        'updated_at': now,
+                    })
                 db.session.commit()
+                seeded_profiles = ReviewProfile.query.filter(ReviewProfile.profile_name.in_([p[0] for p in profiles_to_seed])).all()
                 sample_rules = ComplianceRule.query.limit(10).all()
-                for r in sample_rules:
-                    for prof in [pci, iso]:
-                        exists = ProfileRuleLink.query.filter(ProfileRuleLink.profile_id == prof.id, ProfileRuleLink.rule_id == r.id).first()
+                insert_link = text("""
+                    INSERT OR IGNORE INTO profile_rule_link
+                    (profile_id, rule_id, weight, is_mandatory, added_at, added_by)
+                    VALUES
+                    (:profile_id, :rule_id, :weight, :is_mandatory, :added_at, :added_by)
+                """)
+                for prof in seeded_profiles:
+                    for r in sample_rules:
+                        db.session.execute(insert_link, {
+                            'profile_id': prof.id,
+                            'rule_id': r.id,
+                            'weight': 1.0,
+                            'is_mandatory': True,
+                            'added_at': now,
+                            'added_by': 'system',
+                        })
+                db.session.commit()
+            else:
+                from sqlalchemy import select
+                with db.session.no_autoflush:
+                    for name, framework, version in profiles_to_seed:
+                        exists = db.session.execute(select(ReviewProfile).where(ReviewProfile.profile_name == name)).first()
                         if not exists:
-                            db.session.add(ProfileRuleLink(profile_id=prof.id, rule_id=r.id, weight=1.0, is_mandatory=True, added_by='system'))
+                            db.session.add(ReviewProfile(profile_name=name, compliance_framework=framework, version=version, is_active=True, created_by='system'))
                 db.session.commit()
         except Exception as e:
             logger.warning(f"Default profile seed failed: {e}")
+            db.session.rollback()
         try:
             if ServicePortMapping.query.count() == 0:
                 offline = str(os.getenv('OFFLINE_MODE', '')).strip().lower() in {'1', 'true', 'yes', 'on'}

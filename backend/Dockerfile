@@ -19,4 +19,4 @@ ENV PORT=5001 \
 
 EXPOSE 5001
 
-CMD ["gunicorn", "-w", "3", "-b", "0.0.0.0:5001", "app:app"]
+CMD ["gunicorn", "--preload", "-w", "3", "-b", "0.0.0.0:5001", "app:app"]
