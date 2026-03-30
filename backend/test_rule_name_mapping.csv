@@ -1,0 +1,6 @@
+rule_name,source,destination,dest_port,action,protocol
+Allow Web Traffic,192.168.1.0/24,10.0.0.0/8,80,permit,tcp
+Block SSH,any,192.168.100.0/24,22,deny,tcp
+Allow HTTPS,192.168.1.0/24,any,443,permit,tcp
+Block FTP,any,any,21,deny,tcp
+Allow DNS,192.168.1.0/24,8.8.8.8,53,permit,udp

@@ -1,0 +1,41 @@
+! Cisco ASA Configuration File with Guest Network
+! Generated for usability testing
+!
+hostname guest-test-firewall
+!
+! Access Control Lists for Guest Network Testing
+access-list GUEST_IN line 1 extended permit tcp 192.168.100.0 255.255.255.0 any eq 80
+access-list GUEST_IN line 2 extended permit tcp 192.168.100.0 255.255.255.0 any eq 443
+access-list GUEST_IN line 3 extended deny tcp 192.168.100.0 255.255.255.0 any eq 22
+access-list GUEST_IN line 4 extended deny tcp 192.168.100.0 255.255.255.0 any eq 23
+access-list GUEST_IN line 5 extended permit udp 192.168.100.0 255.255.255.0 any eq 53
+access-list GUEST_IN line 6 extended deny ip 192.168.100.0 255.255.255.0 192.168.1.0 255.255.255.0
+access-list GUEST_IN line 7 extended deny ip 192.168.100.0 255.255.255.0 10.0.0.0 255.0.0.0
+!
+! Production Network Rules
+access-list PROD_IN line 1 extended permit tcp 10.1.0.0 255.255.0.0 any eq 80
+access-list PROD_IN line 2 extended permit tcp 10.1.0.0 255.255.0.0 any eq 443
+access-list PROD_IN line 3 extended permit tcp 10.1.0.0 255.255.0.0 any eq 22
+!
+! Management Network Rules
+access-list MGMT_IN line 1 extended permit tcp 192.168.1.0 255.255.255.0 any eq 22
+access-list MGMT_IN line 2 extended permit tcp 192.168.1.0 255.255.255.0 any eq 443
+!
+! Object Groups
+object-group network GUEST_NETWORK
+ network-object 192.168.100.0 255.255.255.0
+!
+object-group network INTERNAL_NETWORKS
+ network-object 192.168.1.0 255.255.255.0
+ network-object 10.0.0.0 255.0.0.0
+!
+object-group service WEB_SERVICES tcp
+ service-object tcp eq 80
+ service-object tcp eq 443
+!
+! Rules using object groups with Guest network
+access-list GUEST_RESTRICTED line 1 extended deny tcp object-group GUEST_NETWORK object-group INTERNAL_NETWORKS
+access-list GUEST_RESTRICTED line 2 extended permit tcp object-group GUEST_NETWORK any object-group WEB_SERVICES
+access-list GUEST_RESTRICTED line 3 extended deny ip object-group GUEST_NETWORK any
+!
+! End of configuration

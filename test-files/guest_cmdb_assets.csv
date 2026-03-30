@@ -1,0 +1,10 @@
+Hostname,IP Address,Asset Type,Environment,Owner,Location,Description
+web-server-01,192.168.1.10,Server,Production,IT Team,Data Center A,Primary web server
+db-server-01,192.168.1.20,Database,Production,DB Team,Data Center A,Main database server
+app-server-01,192.168.1.30,Application,Production,Dev Team,Data Center B,Application server
+test-server-01,192.168.2.10,Server,Development,QA Team,Data Center B,Testing environment server
+backup-server-01,192.168.1.40,Storage,Production,IT Team,Data Center A,Backup storage server
+guest-wifi-controller,192.168.100.1,Network Device,Guest,Network Team,Building A,Guest WiFi controller
+guest-portal-01,192.168.100.10,Server,Guest,IT Team,Building A,Guest portal authentication server
+guest-dns-01,192.168.100.20,DNS Server,Guest,Network Team,Building A,Guest network DNS server
+guest-proxy-01,192.168.100.30,Proxy,Guest,Security Team,Building A,Guest network web proxy

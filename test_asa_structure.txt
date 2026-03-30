@@ -1,0 +1,20 @@
+
+access-list INSIDE line 80 remark CHG0050117_CHG0050829;21/04/2025 
+access-list INSIDE line 81 extended permit object-group Trend-Micro-Apex object H_172.30.25.117 object-group SUBNET_Trend_Micro (hitcnt=0) 0x8897f42d 
+  access-list INSIDE line 81 extended permit tcp host 172.30.25.117 172.18.251.0 255.255.255.0 range 5274 5275 (hitcnt=0) 0xa6ebbc63 
+  access-list INSIDE line 81 extended permit tcp host 172.30.25.117 172.18.252.0 255.255.255.0 range 5274 5275 (hitcnt=0) 0x0550c3d9 
+  access-list INSIDE line 81 extended permit tcp host 172.30.25.117 172.18.251.0 255.255.255.0 eq 8080 (hitcnt=0) 0xfce387b2 
+  access-list INSIDE line 81 extended permit tcp host 172.30.25.117 172.18.252.0 255.255.255.0 eq 8080 (hitcnt=0) 0x992d54a0 
+  access-list INSIDE line 81 extended permit tcp host 172.30.25.117 172.18.251.0 255.255.255.0 eq www (hitcnt=0) 0x8abeef9e 
+  access-list INSIDE line 81 extended permit tcp host 172.30.25.117 172.18.252.0 255.255.255.0 eq www (hitcnt=0) 0x3172c6b9 
+  access-list INSIDE line 81 extended permit tcp host 172.30.25.117 172.18.251.0 255.255.255.0 eq https (hitcnt=0) 0xe369a4df 
+  access-list INSIDE line 81 extended permit tcp host 172.30.25.117 172.18.252.0 255.255.255.0 eq https (hitcnt=0) 0x2678ba4c 
+access-list INSIDE line 82 extended permit object-group Trend-Micro-Apex object H_172.29.25.82 object-group SUBNET_Trend_Micro (hitcnt=0) 0x1e909f3b 
+  access-list INSIDE line 82 extended permit tcp host 172.29.25.82 172.18.251.0 255.255.255.0 range 5274 5275 (hitcnt=0) 0x3235ecfb 
+  access-list INSIDE line 82 extended permit tcp host 172.29.25.82 172.18.252.0 255.255.255.0 range 5274 5275 (hitcnt=0) 0x64562b3f 
+  access-list INSIDE line 82 extended permit tcp host 172.29.25.82 172.18.251.0 255.255.255.0 eq 8080 (hitcnt=0) 0xc45b001c 
+  access-list INSIDE line 82 extended permit tcp host 172.29.25.82 172.18.252.0 255.255.255.0 eq 8080 (hitcnt=0) 0xc975690d 
+  access-list INSIDE line 82 extended permit tcp host 172.29.25.82 172.18.251.0 255.255.255.0 eq www (hitcnt=0) 0x42eff515 
+  access-list INSIDE line 82 extended permit tcp host 172.29.25.82 172.18.252.0 255.255.255.0 eq www (hitcnt=0) 0x5554c135 
+  access-list INSIDE line 82 extended permit tcp host 172.29.25.82 172.18.251.0 255.255.255.0 eq https (hitcnt=0) 0xd167c601 
+  access-list INSIDE line 82 extended permit tcp host 172.29.25.82 172.18.252.0 255.255.255.0 eq https (hitcnt=0) 0xbfe732dd

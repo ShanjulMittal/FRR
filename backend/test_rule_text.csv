@@ -1,0 +1,4 @@
+Action,Source,Destination,Port,Rule Text
+Allow,192.168.1.10,192.168.2.20,80,Original rule text from CSV - Allow HTTP traffic
+Deny,10.0.0.5,172.16.1.100,443,Original rule text from CSV - Deny HTTPS traffic
+Allow,any,192.168.3.50,22,Original rule text from CSV - Allow SSH access

@@ -1,0 +1,5 @@
+rule_name,action,protocol,source,destination,dest_port,source_port
+Test_Multi_Service_1,permit,TCP,192.168.1.1,10.0.0.1,22;2202;443,any
+Test_Multi_Service_2,permit,TCP,192.168.1.2,10.0.0.2,80;8080;8443,any
+Test_Multi_Service_3,permit,UDP,192.168.1.3,10.0.0.3,53;123;161,any
+Test_Multi_Service_4,deny,TCP,192.168.1.4,10.0.0.4,21;25;110,any

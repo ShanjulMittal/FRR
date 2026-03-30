@@ -1,0 +1,36 @@
+version: "3.9"
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: frr-backend
+    environment:
+      - DATABASE_URL=sqlite:////data/firewall_review.db
+      - TZ=Asia/Kolkata
+    volumes:
+      - backend-data:/data
+    ports:
+      - "5001:5001"
+    networks:
+      - frr-net
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: http://localhost:5001
+    container_name: frr-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    networks:
+      - frr-net
+
+volumes:
+  backend-data:
+    name: frr-backend-data
+
+networks:
+  frr-net:
+    name: frr-net

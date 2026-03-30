@@ -1,0 +1,24 @@
+! Test Firewall Configuration with Object Groups
+! Cisco ASA Configuration
+!
+object-group network OBJ-WEB-SERVERS
+ network-object 192.168.1.100 255.255.255.255
+ network-object 192.168.1.101 255.255.255.255
+ network-object 192.168.1.102 255.255.255.255
+!
+object-group network GRP-DB-SERVERS
+ network-object 10.0.1.50 255.255.255.255
+ network-object 10.0.1.51 255.255.255.255
+!
+object-group service SVC-WEB-PORTS tcp
+ port-object eq 80
+ port-object eq 443
+ port-object eq 8080
+!
+access-list OUTSIDE_IN extended permit tcp any object-group OBJ-WEB-SERVERS object-group SVC-WEB-PORTS
+access-list OUTSIDE_IN extended permit tcp object-group OBJ-WEB-SERVERS object-group GRP-DB-SERVERS eq 3306
+access-list OUTSIDE_IN extended deny ip any any log
+access-list INSIDE_OUT extended permit tcp object-group GRP-DB-SERVERS any eq 443
+access-list INSIDE_OUT extended permit udp any any eq 53
+access-list INSIDE_OUT extended deny ip any any log
+!

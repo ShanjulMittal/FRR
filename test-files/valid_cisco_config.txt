@@ -1,0 +1,34 @@
+! Cisco ASA Configuration File
+! Generated for testing purposes
+!
+hostname test-firewall
+!
+! Access Control Lists
+access-list OUTSIDE_IN line 1 extended permit tcp host 192.168.1.10 host 10.0.0.5 eq 80
+access-list OUTSIDE_IN line 2 extended permit tcp 192.168.1.0 255.255.255.0 host 10.0.0.10 eq 443
+access-list OUTSIDE_IN line 3 extended deny tcp any host 192.168.100.5 eq 22
+access-list OUTSIDE_IN line 4 extended permit udp 172.16.0.0 255.255.0.0 any eq 53
+access-list OUTSIDE_IN line 5 extended permit icmp any any
+!
+! Object Groups
+object-group network WEB_SERVERS
+ network-object host 192.168.1.10
+ network-object host 192.168.1.11
+ network-object host 192.168.1.12
+!
+object-group network DB_SERVERS
+ network-object host 192.168.2.10
+ network-object host 192.168.2.11
+!
+object-group service WEB_SERVICES tcp
+ service-object tcp eq 80
+ service-object tcp eq 443
+!
+! Rules using object groups
+access-list INSIDE_OUT line 1 extended permit tcp object-group WEB_SERVERS object-group DB_SERVERS object-group WEB_SERVICES
+access-list INSIDE_OUT line 2 extended deny ip any any
+!
+! NAT Rules
+nat (inside,outside) 1 source static WEB_SERVERS WEB_SERVERS destination static any any
+!
+! End of configuration

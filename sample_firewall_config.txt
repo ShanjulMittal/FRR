@@ -1,0 +1,21 @@
+! Sample Cisco ASA Firewall Configuration
+!
+access-list OUTSIDE_IN extended permit tcp any host 192.168.1.100 eq 80
+access-list OUTSIDE_IN extended permit tcp any host 192.168.1.100 eq 443
+access-list OUTSIDE_IN extended deny ip any any log
+!
+access-list INSIDE_OUT extended permit tcp 192.168.1.0 255.255.255.0 any eq 80
+access-list INSIDE_OUT extended permit tcp 192.168.1.0 255.255.255.0 any eq 443
+access-list INSIDE_OUT extended permit udp 192.168.1.0 255.255.255.0 any eq 53
+access-list INSIDE_OUT extended deny ip any any log
+!
+object-group network WEB_SERVERS
+ network-object host 192.168.1.100
+ network-object host 192.168.1.101
+!
+object-group service WEB_SERVICES tcp
+ port-object eq 80
+ port-object eq 443
+!
+static (inside,outside) 203.0.113.10 192.168.1.100 netmask 255.255.255.255
+static (inside,outside) 203.0.113.11 192.168.1.101 netmask 255.255.255.255

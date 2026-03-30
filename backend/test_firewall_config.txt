@@ -1,0 +1,20 @@
+! Sample Cisco ASA Configuration for Testing
+! This file contains sample firewall rules to test auto-mapping functionality
+
+access-list OUTSIDE_IN line 10 extended permit tcp any host 192.168.1.100 eq 80
+access-list OUTSIDE_IN line 20 extended permit tcp any host 192.168.1.100 eq 443
+access-list OUTSIDE_IN line 30 extended deny tcp any any eq 22
+access-list INSIDE_OUT line 10 extended permit ip 192.168.1.0 255.255.255.0 any
+access-list INSIDE_OUT line 20 extended deny ip any any
+
+! Object groups for testing
+object-group network WEB_SERVERS
+ network-object host 192.168.1.100
+ network-object host 192.168.1.101
+
+object-group service WEB_SERVICES tcp
+ service-object tcp eq 80
+ service-object tcp eq 443
+
+! NAT rules for testing
+nat (inside,outside) 1 source static 192.168.1.0 192.168.1.0 destination static any any

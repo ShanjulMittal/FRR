@@ -1,0 +1,4 @@
+source,destination,port,protocol,action,rule_name
+192.168.1.0/24,10.0.0.0/8,80,tcp,allow,Web_Access_Rule
+192.168.1.0/24,10.0.0.0/8,443,tcp,allow,HTTPS_Access_Rule
+192.168.2.0/24,any,any,any,deny,Block_Guest_Network

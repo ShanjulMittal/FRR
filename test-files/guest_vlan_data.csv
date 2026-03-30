@@ -1,0 +1,6 @@
+VLAN ID,VLAN Name,Network,Subnet Mask,Description,Environment
+100,VLAN-PROD,10.1.0.0,255.255.0.0,Production network,Production
+200,VLAN-DEV,192.168.2.0,255.255.255.0,Development network,Development
+300,VLAN-DMZ,172.16.1.0,255.255.255.0,DMZ network,Production
+400,VLAN-MGMT,192.168.1.0,255.255.255.0,Management network,Management
+500,VLAN-GUEST,192.168.100.0,255.255.255.0,Guest network for visitors,Guest

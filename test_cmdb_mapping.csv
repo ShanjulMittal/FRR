@@ -1,0 +1,5 @@
+Asset Name,IP Address,Asset Owner,Department,Asset Type,Operating System,Location,Environment,Asset Description,PCI Category
+server1,192.168.1.100,John Smith,IT,Server,Windows Server 2019,Data Center 1,Production,Web server for customer portal,Critical
+server2,192.168.1.101,Jane Doe,IT,Server,Linux Ubuntu 20.04,Data Center 1,Development,Database server for analytics,High
+workstation1,192.168.1.200,Bob Johnson,HR,Workstation,Windows 10,Building A,Office,HR employee workstation,Medium
+router1,192.168.1.1,Network Team,Infrastructure,Network Device,Cisco IOS,Data Center 1,Production,Core router for internal network,High
