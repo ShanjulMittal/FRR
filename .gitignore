@@ -7,6 +7,7 @@ __pycache__/
 *.db
 backend/instance/
 backend/venv/
+backend/uploads/
 frontend/node_modules/
 frontend/build/
 /deploy/
