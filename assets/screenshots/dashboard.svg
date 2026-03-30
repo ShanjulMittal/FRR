@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#121a2b"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a2440"/>
+      <stop offset="1" stop-color="#15203a"/>
+    </linearGradient>
+    <style>
+      .title{font:700 22px -apple-system,BlinkMacSystemFont,Segoe UI,Inter,Roboto,Arial,sans-serif;fill:#e7eefc}
+      .h2{font:600 16px -apple-system,BlinkMacSystemFont,Segoe UI,Inter,Roboto,Arial,sans-serif;fill:#cfe0ff}
+      .label{font:600 12px -apple-system,BlinkMacSystemFont,Segoe UI,Inter,Roboto,Arial,sans-serif;fill:#b5c7ee;letter-spacing:.2px}
+      .small{font:500 12px -apple-system,BlinkMacSystemFont,Segoe UI,Inter,Roboto,Arial,sans-serif;fill:#9fb3df}
+      .value{font:800 22px -apple-system,BlinkMacSystemFont,Segoe UI,Inter,Roboto,Arial,sans-serif;fill:#ffffff}
+    </style>
+  </defs>
+  <rect x="0" y="0" width="1200" height="675" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1200" height="56" fill="#0f172a" opacity="0.95"/>
+  <text x="28" y="36" class="title">Firewall Rule Review</text>
+  <rect x="0" y="56" width="220" height="619" fill="#0b1326"/>
+  <rect x="20" y="92" width="180" height="34" rx="10" fill="#111a33"/>
+  <text x="34" y="114" class="label">Dashboard</text>
+  <text x="34" y="158" class="small">Uploads</text>
+  <text x="34" y="190" class="small">Rules</text>
+  <text x="34" y="222" class="small">Normalized Rules</text>
+  <text x="34" y="254" class="small">CMDB</text>
+  <text x="34" y="286" class="small">VLANs</text>
+  <text x="34" y="318" class="small">Compliance</text>
+  <text x="250" y="98" class="h2">Dashboard</text>
+  <rect x="248" y="116" width="924" height="2" fill="#1c2a4d"/>
+  <rect x="250" y="146" width="285" height="110" rx="14" fill="url(#card)" stroke="#25335a"/>
+  <rect x="560" y="146" width="285" height="110" rx="14" fill="url(#card)" stroke="#25335a"/>
+  <rect x="870" y="146" width="302" height="110" rx="14" fill="url(#card)" stroke="#25335a"/>
+  <text x="274" y="176" class="label">Total Rules</text>
+  <text x="274" y="214" class="value">12,438</text>
+  <text x="584" y="176" class="label">Assets (CMDB)</text>
+  <text x="584" y="214" class="value">2,106</text>
+  <text x="894" y="176" class="label">VLANs</text>
+  <text x="894" y="214" class="value">97</text>
+  <rect x="250" y="278" width="590" height="180" rx="14" fill="url(#card)" stroke="#25335a"/>
+  <text x="274" y="308" class="label">Compliance Score</text>
+  <rect x="274" y="326" width="540" height="12" rx="6" fill="#0b1326" stroke="#24335a"/>
+  <rect x="274" y="326" width="404" height="12" rx="6" fill="#22c55e"/>
+  <text x="740" y="358" class="small">74% passing</text>
+  <path d="M276 420 C340 382, 412 398, 468 362 C540 316, 602 352, 644 330 C704 300, 744 328, 812 302" fill="none" stroke="#60a5fa" stroke-width="4" stroke-linecap="round"/>
+  <path d="M276 420 C340 398, 412 426, 468 408 C536 386, 610 416, 690 392 C748 374, 780 394, 812 382" fill="none" stroke="#a78bfa" stroke-width="3" stroke-linecap="round" opacity="0.85"/>
+  <rect x="870" y="278" width="302" height="372" rx="14" fill="url(#card)" stroke="#25335a"/>
+  <text x="894" y="308" class="label">Recent Activity</text>
+  <rect x="894" y="328" width="254" height="1" fill="#2a3a66"/>
+  <circle cx="904" cy="356" r="6" fill="#22c55e"/>
+  <text x="920" y="360" class="small">Uploaded CMDB.csv</text>
+  <text x="1062" y="360" class="small">2m</text>
+  <circle cx="904" cy="388" r="6" fill="#60a5fa"/>
+  <text x="920" y="392" class="small">Normalized ASA config</text>
+  <text x="1062" y="392" class="small">7m</text>
+  <circle cx="904" cy="420" r="6" fill="#f59e0b"/>
+  <text x="920" y="424" class="small">Imported VLAN map</text>
+  <text x="1062" y="424" class="small">14m</text>
+  <circle cx="904" cy="452" r="6" fill="#a78bfa"/>
+  <text x="920" y="456" class="small">Ran compliance review</text>
+  <text x="1062" y="456" class="small">18m</text>
+  <rect x="250" y="480" width="590" height="170" rx="14" fill="url(#card)" stroke="#25335a"/>
+  <text x="274" y="510" class="label">System Status</text>
+  <rect x="274" y="528" width="540" height="92" rx="12" fill="#0b1326" stroke="#24335a"/>
+  <circle cx="298" cy="560" r="6" fill="#22c55e"/>
+  <text x="314" y="564" class="small">API: healthy</text>
+  <circle cx="298" cy="590" r="6" fill="#22c55e"/>
+  <text x="314" y="594" class="small">Database: connected</text>
+  <circle cx="520" cy="560" r="6" fill="#22c55e"/>
+  <text x="536" y="564" class="small">Uploads: writable</text>
+  <circle cx="520" cy="590" r="6" fill="#60a5fa"/>
+  <text x="536" y="594" class="small">Parsers: ready</text>
+</svg>

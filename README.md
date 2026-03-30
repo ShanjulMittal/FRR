@@ -375,14 +375,13 @@ The dashboard provides:
 
 ### Application Screenshots
 
-Add screenshots under `assets/screenshots/` (PNG recommended) and reference them from the README using these filenames:
+Screenshots:
 
-| Screenshot | File to add |
+| Dashboard | Uploads |
 | --- | --- |
-| Dashboard overview | `assets/screenshots/dashboard.png` |
-| Uploads page (file ingest) | `assets/screenshots/uploads.png` |
-| Normalized Rules (filter + normalize) | `assets/screenshots/normalized-rules.png` |
-| Review Results (findings drilldown) | `assets/screenshots/review-results.png` |
+| ![Dashboard](assets/screenshots/dashboard.svg) | ![Uploads](assets/screenshots/uploads.svg) |
+| Normalized Rules | Review Results |
+| ![Normalized Rules](assets/screenshots/normalized-rules.svg) | ![Review Results](assets/screenshots/review-results.svg) |
 
 ## 🔍 Development
 
