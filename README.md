@@ -49,10 +49,10 @@ Open:
 ### Architecture Diagram
 
 ```mermaid
-flowchart LR
-  UI[Frontend - React + Nginx] -->|/api/*| API[Backend - Flask]
-  API --> DB[SQLite DB]
-  API --> UP[Uploads folder - /data/uploads]
+graph LR
+  UI[Frontend] -->|/api| API[Backend]
+  API --> DB[SQLite database]
+  API --> UP[Uploads folder]
   DB --> API
   UP --> API
 ```
