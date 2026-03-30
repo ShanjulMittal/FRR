@@ -244,6 +244,22 @@ The dashboard provides:
 2. View and search assets in the CMDB section
 3. Filter by environment, asset type, or owner
 
+### UI Pages (What You’ll See + How to Use)
+
+- **Dashboard**: High-level counts and status. Use this first to confirm uploads/normalization changed the totals as expected.
+- **Uploads**: The main ingestion step. Upload Firewall/CMDB/VLAN files, use the column-mapping dialog when needed, then go to the relevant pages below to validate the imported data.
+- **Rules**: Raw parsed firewall rule lines. Use this to spot parsing issues early (missing fields, unexpected actions/services, wrong zones).
+- **Normalized Rules**: Normalized “one rule = one flow” view used for compliance. Filter by Source File and click “Normalize Selected Source” after uploads (especially Cisco ASA). Re-normalize after re-uploading the same ASA file.
+- **CMDB**: Asset inventory (IP/hostname/owner/environment/category). Upload CMDB before running compliance so rules can be enriched with business context.
+- **VLANs**: VLAN/subnet mapping used to enrich rules with VLAN context. Upload VLAN data if you want source/destination VLAN columns populated.
+- **Object Groups**: Discovered/imported object groups and their members. Use “Scan for Groups” after uploading firewall configs to populate groups (useful for ASA-style object-group rules).
+- **Service Mappings**: Port↔service catalog (used during normalization and display). Import from IANA if you want a fuller mapping set; the app auto-seeds a baseline on first run.
+- **Compliance Rules**: View/manage the compliance checks that are applied to normalized rules.
+- **Review Profiles**: Group compliance rules into templates you can run together (e.g., PCI baseline). Use profiles to standardize review runs across files.
+- **Compliance Dashboard**: Summary metrics and charts of compliance outcomes (requires normalized rules, and is better with CMDB/VLAN enrichment).
+- **Review Results**: Detailed per-run/per-rule findings and drilldowns to the underlying normalized rules.
+- **Custom Fields**: Define additional fields extracted from uploads and used in rules/reports (e.g., “rule_name”).
+
 ## 🔍 Development
 
 ### Adding New Parsers
