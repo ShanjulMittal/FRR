@@ -379,9 +379,9 @@ Screenshots:
 
 | Dashboard | Uploads |
 | --- | --- |
-| ![Dashboard](assets/screenshots/dashboard.svg) | ![Uploads](assets/screenshots/uploads.svg) |
+| ![Dashboard](assets/screenshots/dashboard.png) | ![Uploads](assets/screenshots/uploads.png) |
 | Normalized Rules | Review Results |
-| ![Normalized Rules](assets/screenshots/normalized-rules.svg) | ![Review Results](assets/screenshots/review-results.svg) |
+| ![Normalized Rules](assets/screenshots/normalized-rules.png) | ![Review Results](assets/screenshots/review-results.png) |
 
 ## 🔍 Development
 
