@@ -262,6 +262,13 @@ The dashboard provides:
 
 ## 🔍 Development
 
+### Roadmap (Upcoming Features)
+
+- Graphical connectivity view of rules (source → destination) showing servers, services, and allowed flows
+- VLAN-aware environment segmentation (e.g., prod/non-prod) to generate a richer network map
+- Network topology builder to model architecture and place multiple firewalls in the path
+- Single-pane “network stack” view that combines topology + firewall rules + service mappings + CMDB context
+
 ### Adding New Parsers
 
 1. Create a new parser class in `backend/parsers/`
