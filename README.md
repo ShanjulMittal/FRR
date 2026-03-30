@@ -63,7 +63,7 @@ flowchart LR
 flowchart TB
   U[User Uploads Files] --> P[Parser detects format/vendor]
   P --> R[Raw Rules / Raw Records Stored]
-  R --> N[Normalization (one rule = one flow)]
+  R --> N[Normalization: one rule per flow]
   N --> E[Enrichment (CMDB + VLAN + Service Mapping)]
   E --> C[Compliance Evaluation (Profiles + Rules)]
   C --> D[Dashboard + Review Results + Exports]
