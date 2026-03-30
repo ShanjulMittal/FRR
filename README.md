@@ -50,9 +50,9 @@ Open:
 
 ```mermaid
 flowchart LR
-  UI[Frontend (React + Nginx)] -->|/api/*| API[Backend (Flask)]
-  API --> DB[(SQLite DB)]
-  API --> UP[(Uploads Folder /data/uploads)]
+  UI[Frontend - React + Nginx] -->|/api/*| API[Backend - Flask]
+  API --> DB[SQLite DB]
+  API --> UP[Uploads folder - /data/uploads]
   DB --> API
   UP --> API
 ```
@@ -61,12 +61,12 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-  U[User Uploads Files] --> P[Parser detects format/vendor]
+  U[User uploads files] --> P[Parser detects format and vendor]
   P --> R[Raw Rules / Raw Records Stored]
   R --> N[Normalization: one rule per flow]
-  N --> E[Enrichment (CMDB + VLAN + Service Mapping)]
-  E --> C[Compliance Evaluation (Profiles + Rules)]
-  C --> D[Dashboard + Review Results + Exports]
+  N --> E[Enrichment: CMDB + VLAN + service mapping]
+  E --> C[Compliance evaluation: profiles + rules]
+  C --> D[Dashboard + review results + exports]
 ```
 
 ### Data Model (At a Glance)
