@@ -35,6 +35,27 @@ Open:
 - Improved VLAN auto-detection in the mapping dialog and ensured VLAN fields render correctly in normalized rules.
 - Improved VLAN enrichment during normalization when source/destination contains object-groups, CIDRs, or ranges.
 
+## ✅ Compliance Rules
+
+- Define atomic checks on normalized rules. Each rule specifies:
+  - field_to_check: which normalized field to evaluate (e.g., `action`, `protocol`, `service_port`, `source_ip`, `dest_zone`)
+  - operator: one of `equals`, `not_equals`, `in_list`, `not_in_list`, `regex_match`, `contains`
+  - value: expected value or list (comma-separated) depending on operator
+  - logic: optional `AND`/`OR`/`NOT` for composing multi-conditions
+  - severity: `Critical`, `High`, `Medium`, `Low`
+  - is_active: toggle to enable/disable a rule
+- Group rules into Review Profiles (e.g., PCI, SOX, NIST) to run reviews consistently.
+- Results appear under Review Results with evidence and can be exported.
+  
+Example checks:
+- Deny rules baseline: `field_to_check=action`, `operator=in_list`, `value=deny,drop`, `severity=Low`
+- Restrict risky protocols: `field_to_check=destination_port`, `operator=in_list`, `value=22,23,21,3389`, `severity=High`
+- Disallow Any-to-Any: `field_to_check=source_ip`, `operator=equals`, `value=0.0.0.0/0`, `severity=Critical`
+  
+Data model:
+- Storage and fields: [models.py: ComplianceRule](file:///Users/shanjulmittal/FRR/backend/models.py#L1087-L1134)
+- Profiles and links: [models.py: ReviewProfile](file:///Users/shanjulmittal/FRR/backend/models.py#L1137-L1172), [models.py: ProfileRuleLink](file:///Users/shanjulmittal/FRR/backend/models.py#L1175-L1199)
+
 ## 🚀 Features
 
 - **Firewall Rule Management**: Parse and analyze firewall configurations from various formats
