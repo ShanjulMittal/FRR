@@ -540,6 +540,326 @@ def get_compliance_operators():
         logger.error(f"Error getting operators: {e}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
+@app.route('/api/compliance-rules/seed/defaults', methods=['POST'])
+def seed_default_compliance_rules():
+    try:
+        now = datetime.utcnow().isoformat(sep=' ', timespec='seconds')
+        seeded_count = 0
+
+        def ensure_rule(rule_name: str, description: str, severity: str, composite_value: dict = None,
+                        field_to_check: str = None, operator: str = None, value: str = None):
+            nonlocal seeded_count
+            existing = ComplianceRule.query.filter(ComplianceRule.rule_name == rule_name).first()
+            if existing:
+                changed = False
+                if description and existing.description != description:
+                    existing.description = description
+                    changed = True
+                if severity and existing.severity != severity:
+                    existing.severity = severity
+                    changed = True
+                if composite_value is not None:
+                    cv = json.dumps(composite_value)
+                    if existing.operator != 'composite':
+                        existing.operator = 'composite'
+                        changed = True
+                    if existing.value != cv:
+                        existing.value = cv
+                        changed = True
+                    existing.field_to_check = 'composite'
+                else:
+                    if field_to_check and existing.field_to_check != field_to_check:
+                        existing.field_to_check = field_to_check
+                        changed = True
+                    if operator and existing.operator != operator:
+                        existing.operator = operator
+                        changed = True
+                    if value is not None and existing.value != value:
+                        existing.value = value
+                        changed = True
+                if changed:
+                    db.session.commit()
+                return False
+            if composite_value is not None:
+                r = ComplianceRule(
+                    rule_name=rule_name,
+                    description=description,
+                    field_to_check='composite',
+                    operator='composite',
+                    logic=None,
+                    value=json.dumps(composite_value),
+                    severity=severity,
+                    is_active=True,
+                    created_by='system'
+                )
+            else:
+                r = ComplianceRule(
+                    rule_name=rule_name,
+                    description=description,
+                    field_to_check=field_to_check or 'action',
+                    operator=operator or 'equals',
+                    logic=None,
+                    value=value or '',
+                    severity=severity,
+                    is_active=True,
+                    created_by='system'
+                )
+            db.session.add(r)
+            db.session.commit()
+            try:
+                profiles = ReviewProfile.query.all()
+                for p in profiles:
+                    link_exists = ProfileRuleLink.query.filter(ProfileRuleLink.profile_id == p.id, ProfileRuleLink.rule_id == r.id).first()
+                    if not link_exists:
+                        db.session.add(ProfileRuleLink(profile_id=p.id, rule_id=r.id, weight=1.0, is_mandatory=True, added_by='system'))
+                db.session.commit()
+            except Exception as le:
+                logger.warning(f"Failed to link rule '{rule_name}' to profiles: {le}")
+                db.session.rollback()
+            seeded_count += 1
+            return True
+
+        # Broad ANY exposure checks
+        ensure_rule(
+            'Any-to-Any IP Permit',
+            'Permit with protocol=ip from any to any is non-compliant',
+            'Critical',
+            composite_value={
+                "logic": "AND",
+                "conditions": [
+                    {"field": "action", "operator": "equals", "value": "permit"},
+                    {"field": "protocol", "operator": "equals", "value": "ip"},
+                    {"field": "source_ip", "operator": "equals", "value": "any"},
+                    {"field": "dest_ip", "operator": "equals", "value": "any"}
+                ]
+            }
+        )
+        ensure_rule(
+            'Open Service - ANY',
+            'Permit with service/application ANY while specific source/destination',
+            'High',
+            composite_value={
+                "logic": "AND",
+                "conditions": [
+                    {"field": "action", "operator": "equals", "value": "permit"},
+                    {"logic": "AND", "conditions": [
+                        {"field": "source_ip", "operator": "not_equals", "value": "any"},
+                        {"field": "dest_ip", "operator": "not_equals", "value": "any"}
+                    ]},
+                    {"logic": "OR", "conditions": [
+                        {"field": "service_port", "operator": "equals", "value": "any"},
+                        {"field": "service_port", "operator": "regex_match", "value": r"^(0|1)\\s*-\\s*65535$"},
+                        {"field": "service_name", "operator": "equals", "value": "any"},
+                        {"field": "application", "operator": "equals", "value": "any"}
+                    ]}
+                ]
+            }
+        )
+
+        # Insecure protocols/services exposure from Internet to Internal
+        insecure_services = [
+            ('FTP', 21, 'tcp'),
+            ('TELNET', 23, 'tcp'),
+            ('TFTP', 69, 'udp'),
+            ('FINGER', 79, 'tcp'),
+            ('NETBIOS-NS', 137, 'udp'),
+            ('NETBIOS-DGM', 138, 'udp'),
+            ('NETBIOS-SSN', 139, 'tcp'),
+            ('SMB', 445, 'tcp'),
+            ('RLOGIN', 513, 'tcp'),
+            ('REXEC', 512, 'tcp'),
+            ('RSH', 514, 'tcp'),
+            ('NFS', 2049, 'tcp'),
+            ('VNC', 5900, 'tcp'),
+            ('RDP', 3389, 'tcp'),
+            ('SNMP', 161, 'udp'),
+            ('SNMPTRAP', 162, 'udp'),
+            ('LDAP', 389, 'tcp'),
+        ]
+        for name, port, proto in insecure_services:
+            ensure_rule(
+                f'Critical Service Exposure - {name} ({port}/{proto})',
+                f'Non-compliant to allow {name} from Internet to Internal',
+                'Critical',
+                composite_value={
+                    "logic": "AND",
+                    "conditions": [
+                        {"field": "action", "operator": "equals", "value": "permit"},
+                        {"field": "protocol", "operator": "equals", "value": proto},
+                        {"field": "dest_port", "operator": "in_list", "value": str(port)},
+                        {"field": "source_zone", "operator": "contains", "value": "internet"},
+                        {"field": "dest_zone", "operator": "contains", "value": "internal"}
+                    ]
+                }
+            )
+
+        # Admin ports from ANY to Internal
+        admin_ports = [
+            ('SSH from ANY', 22, 'tcp'),
+            ('RDP from ANY', 3389, 'tcp'),
+            ('VNC from ANY', 5900, 'tcp'),
+            ('WinRM from ANY', 5985, 'tcp'),
+        ]
+        for name, port, proto in admin_ports:
+            ensure_rule(
+                f'Admin Exposure - {name}',
+                f'Non-compliant to allow admin port {port}/{proto} from ANY to Internal',
+                'High',
+                composite_value={
+                    "logic": "AND",
+                    "conditions": [
+                        {"field": "action", "operator": "equals", "value": "permit"},
+                        {"field": "protocol", "operator": "equals", "value": proto},
+                        {"field": "dest_port", "operator": "in_list", "value": str(port)},
+                        {"field": "dest_zone", "operator": "contains", "value": "internal"}
+                    ]
+                }
+            )
+
+        # Broad outbound ANY service rules
+        ensure_rule(
+            'Outbound ANY Service',
+            'Permit to ANY service from Internal is non-compliant',
+            'Medium',
+            composite_value={
+                "logic": "AND",
+                "conditions": [
+                    {"field": "action", "operator": "equals", "value": "permit"},
+                    {"field": "source_zone", "operator": "contains", "value": "internal"},
+                    {"logic": "OR", "conditions": [
+                        {"field": "service_port", "operator": "equals", "value": "any"},
+                        {"field": "service_port", "operator": "regex_match", "value": r"^(0|1)\\s*-\\s*65535$"},
+                        {"field": "application", "operator": "equals", "value": "any"}
+                    ]}
+                ]
+            }
+        )
+
+        # Email ports from Internet to Internal
+        email_ports = [
+            ('SMTP', 25), ('POP3', 110), ('IMAP', 143)
+        ]
+        for name, port in email_ports:
+            ensure_rule(
+                f'Email Exposure - {name} {port}/tcp',
+                f'Non-compliant to allow inbound {name} to Internal unless specifically justified',
+                'High',
+                composite_value={
+                    "logic": "AND",
+                    "conditions": [
+                        {"field": "action", "operator": "equals", "value": "permit"},
+                        {"field": "protocol", "operator": "equals", "value": "tcp"},
+                        {"field": "dest_port", "operator": "in_list", "value": str(port)},
+                        {"field": "source_zone", "operator": "contains", "value": "internet"},
+                        {"field": "dest_zone", "operator": "contains", "value": "internal"}
+                    ]
+                }
+            )
+
+        # Database ports exposure from Internet to Internal
+        db_ports = [('MySQL', 3306), ('PostgreSQL', 5432), ('MSSQL', 1433), ('Oracle', 1521)]
+        for name, port in db_ports:
+            ensure_rule(
+                f'Database Exposure - {name} {port}/tcp',
+                f'Non-compliant to allow inbound {name} from Internet to Internal',
+                'Critical',
+                composite_value={
+                    "logic": "AND",
+                    "conditions": [
+                        {"field": "action", "operator": "equals", "value": "permit"},
+                        {"field": "protocol", "operator": "equals", "value": "tcp"},
+                        {"field": "dest_port", "operator": "in_list", "value": str(port)},
+                        {"field": "source_zone", "operator": "contains", "value": "internet"},
+                        {"field": "dest_zone", "operator": "contains", "value": "internal"}
+                    ]
+                }
+            )
+
+        # ICMP any-any
+        ensure_rule(
+            'ICMP Any-to-Any',
+            'Permit ICMP from any to any indicates broad exposure',
+            'Medium',
+            composite_value={
+                "logic": "AND",
+                "conditions": [
+                    {"field": "action", "operator": "equals", "value": "permit"},
+                    {"field": "protocol", "operator": "equals", "value": "icmp"},
+                    {"field": "source_ip", "operator": "equals", "value": "any"},
+                    {"field": "dest_ip", "operator": "equals", "value": "any"}
+                ]
+            }
+        )
+
+        # Reuse the earlier "Specific Source/Dest with Any Service" if missing
+        try:
+            ensure_rule(
+                'Specific Source/Dest with Any Service',
+                'Non-compliant if Source and Destination are specific but Service/Application is ANY',
+                'High',
+                composite_value={
+                    "logic": "AND",
+                    "conditions": [
+                        {"field": "action", "operator": "equals", "value": "permit"},
+                        {"logic": "AND", "conditions": [
+                            {"field": "source_ip", "operator": "not_equals", "value": "any"},
+                            {"field": "source_ip", "operator": "is_not_empty", "value": ""}
+                        ]},
+                        {"logic": "AND", "conditions": [
+                            {"field": "dest_ip", "operator": "not_equals", "value": "any"},
+                            {"field": "dest_ip", "operator": "is_not_empty", "value": ""}
+                        ]},
+                        {"logic": "OR", "conditions": [
+                            {"field": "service_port", "operator": "equals", "value": "any"},
+                            {"field": "service_port", "operator": "regex_match", "value": r"^(\*|any|all|0\\s*-\\s*65535|1\\s*-\\s*65535)$"},
+                            {"field": "dest_port", "operator": "equals", "value": "any"},
+                            {"field": "dest_port", "operator": "regex_match", "value": r"^(\*|any|all|0\\s*-\\s*65535|1\\s*-\\s*65535)$"},
+                            {"field": "service_name", "operator": "equals", "value": "any"},
+                            {"field": "service_name", "operator": "regex_match", "value": r"^(\*|any|all)$"},
+                            {"field": "protocol", "operator": "in_list", "value": "any,ip,*"},
+                            {"logic": "AND", "conditions": [
+                                {"field": "service_port", "operator": "is_empty", "value": ""},
+                                {"field": "dest_port", "operator": "is_empty", "value": ""},
+                                {"field": "service_name", "operator": "is_empty", "value": ""}
+                            ]}
+                        ]},
+                        {"logic": "OR", "conditions": [
+                            {"field": "application", "operator": "equals", "value": "any"},
+                            {"field": "application", "operator": "regex_match", "value": r"^(\*|any|all)$"},
+                            {"field": "application", "operator": "is_empty", "value": ""}
+                        ]}
+                    ]
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Seeding Specific Source/Dest rule duplicate handling failed: {e}")
+
+        # Generate port-block baseline for common risky ports (adds many small rules)
+        risky_ports = [
+            7, 19, 20, 21, 23, 69, 79, 111, 135, 137, 138, 139, 445, 512, 513, 514, 2049, 3389, 5900, 1433, 1521, 3306, 5432
+        ]
+        for p in risky_ports:
+            ensure_rule(
+                f'Risky Port Exposure {p}/tcp',
+                'Permit to risky TCP port is non-compliant unless justified',
+                'High',
+                composite_value={
+                    "logic": "AND",
+                    "conditions": [
+                        {"field": "action", "operator": "equals", "value": "permit"},
+                        {"field": "protocol", "operator": "equals", "value": "tcp"},
+                        {"field": "dest_port", "operator": "in_list", "value": str(p)}
+                    ]
+                }
+            )
+
+        return jsonify({'success': True, 'seeded': seeded_count})
+    except Exception as e:
+        logger.error(f"Error seeding default compliance rules: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
 @app.route('/api/object-groups/bulk-delete', methods=['DELETE'])
 def bulk_delete_object_groups():
     try:
