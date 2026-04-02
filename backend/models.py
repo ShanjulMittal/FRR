@@ -635,15 +635,77 @@ class NormalizedRule(db.Model):
                 for token in tokens:
                     if not token:
                         continue
-                    t_clean = re.sub(r'^(?:range[_\s-]?|host[_\s-]?|h[_\s-]?|subnet[_\s-]?|network[_\s-]?)','', token, flags=re.IGNORECASE).strip()
-                    m_mask = re.search(r'(\d{1,3}(?:\.\d{1,3}){3})(?:[_\-]|M)(\d{1,2})', t_clean)
+                    t_clean = re.sub(r'^(?:object-group\s+|object\s+)?', '', str(token), flags=re.IGNORECASE).strip()
+                    t_clean = re.sub(r'^(?:range[_\s-]?|host[_\s-]?|h[_\s-]?|subnet[_\s-]?|network[_\s-]?)','', t_clean, flags=re.IGNORECASE).strip()
+                    m_r_full = re.fullmatch(r"(?i)R_(\d{1,3}(?:\.\d{1,3}){3})[-_](\d{1,3}(?:\.\d{1,3}){3})", t_clean)
+                    m_r_last = re.fullmatch(r"(?i)R_((?:\d{1,3}\.){3})(\d{1,3})[-_](\d{1,3})", t_clean)
+                    if m_r_full or m_r_last:
+                        try:
+                            if m_r_full:
+                                left = m_r_full.group(1)
+                                right = m_r_full.group(2)
+                            else:
+                                prefix = m_r_last.group(1)
+                                d_start = m_r_last.group(2)
+                                d_end = m_r_last.group(3)
+                                left = f"{prefix}{d_start}"
+                                right = f"{prefix}{d_end}"
+                            start_ip = ipaddress.ip_address(left)
+                            end_ip = ipaddress.ip_address(right)
+                            assets = db.session.query(CMDBAsset).all()
+                            for a in assets:
+                                if not a.ip_address:
+                                    continue
+                                try:
+                                    ip = ipaddress.ip_address(a.ip_address)
+                                    if start_ip <= ip <= end_ip:
+                                        app = None
+                                        pci = None
+                                        try:
+                                            add = json.loads(a.additional_data) if a.additional_data else {}
+                                            app = add.get('application') or add.get('application_name') or add.get('app') or add.get('service') or add.get('service_name')
+                                            pci = add.get('pcidss_asset_category')
+                                        except Exception:
+                                            app = None
+                                            pci = None
+                                        matches.append({
+                                            'hostname': a.hostname,
+                                            'ip_address': a.ip_address,
+                                            'owner': a.owner,
+                                            'department': a.department,
+                                            'environment': a.environment,
+                                            'asset_type': a.asset_type,
+                                            'operating_system': a.operating_system,
+                                            'model': a.model,
+                                            'manufacturer': a.manufacturer,
+                                            'location': a.location,
+                                            'business_unit': a.business_unit,
+                                            'application': app,
+                                            'pcidss_asset_category': pci
+                                        })
+                                except Exception:
+                                    continue
+                            continue
+                        except Exception:
+                            pass
+                    m_mask = re.fullmatch(r'(\d{1,3}(?:\.\d{1,3}){3})(?:[_]|M|-)(\d{1,2})', t_clean)
                     if m_mask:
                         ip_part = m_mask.group(1)
                         prefix = m_mask.group(2)
-                        t_clean = f"{ip_part}/{prefix}"
+                        try:
+                            p = int(prefix)
+                            if 0 <= p <= 32:
+                                t_clean = f"{ip_part}/{p}"
+                        except Exception:
+                            pass
                     m_cidr_dash = re.fullmatch(r"(\d{1,3}(?:\.\d{1,3}){3})-(\d{1,2})", t_clean)
                     if m_cidr_dash:
-                        t_clean = f"{m_cidr_dash.group(1)}/{m_cidr_dash.group(2)}"
+                        try:
+                            p = int(m_cidr_dash.group(2))
+                            if 0 <= p <= 32:
+                                t_clean = f"{m_cidr_dash.group(1)}/{p}"
+                        except Exception:
+                            pass
                     if '/' in t_clean:
                         try:
                             network = ipaddress.ip_network(t_clean, strict=False)

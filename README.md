@@ -28,6 +28,13 @@ Open:
 - [Development](#-development)
 - [Troubleshooting](#-troubleshooting)
 
+## Recent Updates
+
+- Fixed CMDB IP-range matching for normalized rules (e.g., `R_<start>-<end>` no longer over-matches unrelated IPs).
+- Fixed VLAN import field mapping (CSV + Excel) and improved header normalization during import.
+- Improved VLAN auto-detection in the mapping dialog and ensured VLAN fields render correctly in normalized rules.
+- Improved VLAN enrichment during normalization when source/destination contains object-groups, CIDRs, or ranges.
+
 ## 🚀 Features
 
 - **Firewall Rule Management**: Parse and analyze firewall configurations from various formats

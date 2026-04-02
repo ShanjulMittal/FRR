@@ -1711,6 +1711,25 @@ def delete_cmdb_asset(asset_id):
         db.session.rollback()
         return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
+@app.route('/api/cmdb/bulk-delete', methods=['DELETE'])
+def bulk_delete_cmdb_assets():
+    try:
+        data = request.get_json() or {}
+        if data.get('delete_all'):
+            db.session.query(CMDBAsset).delete()
+            db.session.commit()
+            return jsonify({'success': True})
+        asset_ids = data.get('asset_ids')
+        if asset_ids and isinstance(asset_ids, list):
+            db.session.query(CMDBAsset).filter(CMDBAsset.id.in_(asset_ids)).delete(synchronize_session=False)
+            db.session.commit()
+            return jsonify({'success': True})
+        return jsonify({'success': False, 'error': 'Invalid request'}), 400
+    except Exception as e:
+        logger.error(f"Error bulk deleting CMDB assets: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
 @app.route('/api/reviews/results', methods=['GET'])
 def list_review_results():
     try:
@@ -2346,6 +2365,7 @@ def available_fields(file_type):
                 {'value': 'subnet', 'label': 'Subnet', 'description': 'CIDR subnet', 'mandatory': False, 'important': True},
                 {'value': 'gateway', 'label': 'Gateway', 'description': 'Default gateway', 'mandatory': False, 'important': False},
                 {'value': 'location', 'label': 'Location', 'description': 'Site/location', 'mandatory': False, 'important': False},
+                {'value': 'description', 'label': 'Description', 'description': 'VLAN description', 'mandatory': False, 'important': False},
                 {'value': 'vlan_type', 'label': 'VLAN Type', 'description': 'Access/Trunk/etc', 'mandatory': False, 'important': False},
                 {'value': 'status', 'label': 'Status', 'description': 'Active/Retired/etc', 'mandatory': False, 'important': False},
             ]
@@ -2469,18 +2489,17 @@ def analyze_file():
         columns = []
         total_rows = 0
 
-        # Read small buffer and try CSV parsing
+        # Read file bytes
         try:
             content = upload.stream.read()
         except Exception:
             content = upload.read()
-        if isinstance(content, bytes):
-            try:
-                text_content = content.decode('utf-8', errors='ignore')
-            except Exception:
-                text_content = content.decode('latin-1', errors='ignore')
-        else:
-            text_content = str(content)
+        if not isinstance(content, (bytes, bytearray)):
+            content = str(content).encode('utf-8', errors='ignore')
+        try:
+            text_content = content.decode('utf-8', errors='ignore')
+        except Exception:
+            text_content = content.decode('latin-1', errors='ignore')
 
         # Detect text firewall configs and parse with FirewallParser
         is_text_cfg = False
@@ -2527,36 +2546,44 @@ def analyze_file():
                 logger.error(f"Error parsing text firewall config: {e}")
                 # fall through to CSV heuristics
 
-        # Basic CSV detection: robust parsing
+        # Parse tabular data (CSV or Excel)
+        rows = []
         try:
-            # Handle BOM if present
-            if text_content.startswith('\ufeff'):
-                text_content = text_content[1:]
-            
-            # Use StringIO for proper CSV handling (quotes, newlines)
-            f = io.StringIO(text_content)
-            # Read first few lines for preview
-            sample_lines = []
-            for _ in range(200):
-                line = f.readline()
-                if not line: break
-                sample_lines.append(line)
-            
-            f_sample = io.StringIO(''.join(sample_lines))
-            reader = csv.reader(f_sample)
-            rows = list(reader)
-            if rows:
-                columns = [c.strip() for c in rows[0]]
-                for r in rows[1:6]:
-                    row_dict = {}
-                    for i, col in enumerate(columns):
-                        row_dict[col] = r[i] if i < len(r) else ''
-                    preview_data.append(row_dict)
-                total_rows = max(0, len(rows) - 1)
-        except Exception:
+            if name_lower.endswith('.xlsx') or name_lower.endswith('.xls'):
+                import pandas as pd
+                df = pd.read_excel(io.BytesIO(content), engine='openpyxl', dtype=str)
+                df = df.fillna('')
+                columns = [str(c).strip() for c in df.columns.tolist()]
+                rows = [columns] + df.astype(str).values.tolist()
+            else:
+                if text_content.startswith('\ufeff'):
+                    text_content = text_content[1:]
+                f = io.StringIO(text_content)
+                sample_lines = []
+                for _ in range(200):
+                    line = f.readline()
+                    if not line:
+                        break
+                    sample_lines.append(line)
+                f_sample = io.StringIO(''.join(sample_lines))
+                reader = csv.reader(f_sample)
+                rows = list(reader)
+                if rows:
+                    columns = [c.strip() for c in rows[0]]
+        except Exception as e:
+            logger.error(f"Tabular parsing failed: {e}")
+            rows = []
             columns = []
             preview_data = []
             total_rows = 0
+
+        if rows and columns:
+            for r in rows[1:6]:
+                row_dict = {}
+                for i, col in enumerate(columns):
+                    row_dict[col] = r[i] if i < len(r) else ''
+                preview_data.append(row_dict)
+            total_rows = max(0, len(rows) - 1)
 
         # Heuristics for detected fields and suggestions
         def norm(s):
@@ -2617,6 +2644,32 @@ def analyze_file():
             'description': ['description', 'desc'],
             'group_type': ['type', 'group_type']
         }
+        if (file_type or '').lower() == 'cmdb':
+            target_map = {
+                'hostname': ['hostname', 'host', 'host_name', 'name', 'asset_name', 'ci_name'],
+                'ip_address': ['ip', 'ip_address', 'ipaddress', 'ip address', 'primary_ip', 'primary ip'],
+                'owner': ['owner', 'owned_by', 'owned by', 'business_owner', 'application_owner'],
+                'department': ['department', 'dept', 'function'],
+                'asset_type': ['asset_type', 'asset type', 'server_type', 'server type'],
+                'operating_system': ['operating_system', 'operating system', 'os_type', 'os type'],
+                'location': ['location', 'site', 'datacenter', 'data center'],
+                'environment': ['environment', 'env'],
+                'status': ['status', 'ci_status', 'ci status'],
+                'application_name': ['application', 'application_name', 'app', 'app_name'],
+                'description': ['description', 'ci_description', 'ci description'],
+                'pcidss_asset_category': ['pcidss_asset_category', 'pci dss category', 'pci_dss_category', 'pci category'],
+            }
+        elif (file_type or '').lower() == 'vlan':
+            target_map = {
+                'vlan_id': ['vlan_id', 'vlan id', 'id'],
+                'name': ['name', 'vlan name'],
+                'subnet': ['subnet', 'cidr', 'network', 'network segment'],
+                'gateway': ['gateway', 'default gateway', 'gw'],
+                'location': ['location', 'site', 'datacenter', 'data center'],
+                'vlan_type': ['vlan_type', 'vlan type', 'type'],
+                'status': ['status', 'state'],
+                'description': ['description', 'desc']
+            }
 
         for col in columns:
             cn = col_norms.get(col, '')
@@ -2636,20 +2689,40 @@ def analyze_file():
                 confidence_scores[col] = best_conf
             # suggestions list
             cand = []
-            for field in ['source_ip','dest_ip','service_port','action','protocol','source_zone','dest_zone','rule_name','name','members']:
+            if (file_type or '').lower() == 'cmdb':
+                suggestion_fields = ['hostname','ip_address','owner','department','asset_type','operating_system','location','environment','status','application_name','pcidss_asset_category','description']
+            elif (file_type or '').lower() == 'vlan':
+                suggestion_fields = ['vlan_id','name','subnet','gateway','location','vlan_type','status','description']
+            else:
+                suggestion_fields = ['source_ip','dest_ip','service_port','action','protocol','source_zone','dest_zone','rule_name','name','members']
+            for field in suggestion_fields:
                 score = 0.5 if field not in (best or '') else best_conf
                 cand.append({'field': field, 'confidence': score, 'reason': 'heuristic'})
             suggestions[col] = cand[:3]
             # priorities
             fp = 'optional'
-            if detected_fields.get(col) in ('source_ip','dest_ip','service','service_port','dest_port','service_name','description','group_type'):
+            if (file_type or '').lower() == 'cmdb':
+                if detected_fields.get(col) in ('hostname','ip_address','owner','department','asset_type','operating_system','location','environment','pcidss_asset_category'):
+                    fp = 'important'
+                if detected_fields.get(col) in ('ip_address',):
+                    fp = 'mandatory'
+            elif (file_type or '').lower() == 'vlan':
+                if detected_fields.get(col) in ('vlan_id','subnet'):
+                    fp = 'important'
+                if detected_fields.get(col) in ('vlan_id',):
+                    fp = 'mandatory'
+            elif detected_fields.get(col) in ('source_ip','dest_ip','service','service_port','dest_port','service_name','description','group_type'):
                 fp = 'important'
             if detected_fields.get(col) in ('action','rule_name','name','members'):
                 fp = 'mandatory'
             field_priorities[col] = fp
 
-        mandatory_fields = {'action'}
-        important_fields = {'source_ip','dest_ip','service','service_port','dest_port','service_name'}
+        if (file_type or '').lower() == 'cmdb':
+            mandatory_fields = {'ip_address'}
+            important_fields = {'hostname', 'owner', 'environment', 'pcidss_asset_category'}
+        else:
+            mandatory_fields = {'action'}
+            important_fields = {'source_ip','dest_ip','service','service_port','dest_port','service_name'}
         
         if file_type == 'objects':
             mandatory_fields = {'name', 'members'}
@@ -2692,18 +2765,17 @@ def upload_file():
 
         filename = upload.filename or 'uploaded.csv'
         name_lower = (filename or '').lower()
-        # Read content
+        # Read file bytes
         try:
             content = upload.stream.read()
         except Exception:
             content = upload.read()
-        if isinstance(content, bytes):
-            try:
-                text_content = content.decode('utf-8', errors='ignore')
-            except Exception:
-                text_content = content.decode('latin-1', errors='ignore')
-        else:
-            text_content = str(content)
+        if not isinstance(content, (bytes, bytearray)):
+            content = str(content).encode('utf-8', errors='ignore')
+        try:
+            text_content = content.decode('utf-8', errors='ignore')
+        except Exception:
+            text_content = content.decode('latin-1', errors='ignore')
 
         # Handle text firewall configuration via parser
         if (file_type or '').lower() == 'firewall' and (name_lower.endswith('.txt') or name_lower.endswith('.conf') or ('access-list' in (text_content.lower() if text_content else ''))):
@@ -2991,22 +3063,28 @@ def upload_file():
                 logger.error(f"Error uploading text firewall config: {e}")
                 return jsonify({'message': 'Internal server error'}), 500
 
-        # Parse CSV
+        # Parse tabular content (CSV or Excel)
         rows = []
         columns = []
         try:
-            # Handle BOM
-            if text_content.startswith('\ufeff'):
-                text_content = text_content[1:]
-            
-            f = io.StringIO(text_content)
-            reader = csv.reader(f)
-            rows = list(reader)
-            if rows:
-                columns = [c.strip() for c in rows[0]]
-                logger.info(f"CSV Upload: Detected columns: {columns}")
+            if name_lower.endswith('.xlsx') or name_lower.endswith('.xls'):
+                import pandas as pd
+                df = pd.read_excel(io.BytesIO(content), engine='openpyxl', dtype=str)
+                df = df.fillna('')
+                columns = [str(c).strip() for c in df.columns.tolist()]
+                rows = [columns] + df.astype(str).values.tolist()
+                logger.info(f"Excel Upload: Detected columns: {columns}")
+            else:
+                if text_content.startswith('\ufeff'):
+                    text_content = text_content[1:]
+                f = io.StringIO(text_content)
+                reader = csv.reader(f)
+                rows = list(reader)
+                if rows:
+                    columns = [c.strip() for c in rows[0]]
+                    logger.info(f"CSV Upload: Detected columns: {columns}")
         except Exception as e:
-            logger.error(f"CSV Parsing failed: {e}")
+            logger.error(f"Tabular parsing failed: {e}")
             rows = []
             columns = []
 
@@ -3303,9 +3381,41 @@ def upload_file():
                         if target == field_name:
                             col_for_field = col; break
                     return get_val(r, col_for_field) if col_for_field else ''
+                def _cell_str(v):
+                    try:
+                        if v is None:
+                            return ''
+                        s = str(v)
+                        if s == 'nan':
+                            return ''
+                        return s
+                    except Exception:
+                        return ''
                 add = {}
                 for i, col in enumerate(columns):
-                    add[col] = r[i] if i < len(r) else ''
+                    add[col] = _cell_str(r[i] if i < len(r) else '')
+                # Normalize known keys into canonical additional_data entries
+                try:
+                    # Application name normalization using mapping or common variants
+                    app_val = _cell_str(map_field('application_name') or get_val(r, 'Application') or get_val(r, 'Application Name') or get_val(r, 'App Name') or get_val(r, 'App'))
+                    if app_val:
+                        add['application_name'] = app_val
+                        add['application'] = app_val
+                    # Operating system normalization into additional_data for front-end visibility
+                    mapped_os = _cell_str(map_field('operating_system'))
+                    candidate_os = _cell_str(get_val(r, 'Operating System') or get_val(r, 'OS Type') or get_val(r, 'OS'))
+                    eol_os = _cell_str(get_val(r, 'EOL/EOS') or get_val(r, 'OS EOL/EOS'))
+                    bad_markers = {'not applicable', 'n/a', 'na', 'none', 'unknown'}
+                    mapped_os_l = (mapped_os or '').strip().lower()
+                    chosen_os = mapped_os or candidate_os
+                    if candidate_os:
+                        if (not mapped_os) or (mapped_os_l in bad_markers) or (eol_os and mapped_os == eol_os):
+                            chosen_os = candidate_os
+                    os_val = _cell_str(chosen_os)
+                    if os_val:
+                        add['operating_system'] = os_val
+                except Exception:
+                    pass
                 # normalize PCI DSS category to canonical key if present under variants
                 try:
                     lk = {str(k).lower(): k for k in add.keys()}
@@ -3323,15 +3433,15 @@ def upload_file():
                     pass
                 asset = CMDBAsset(
                     source_file=filename,
-                    hostname=map_field('hostname') or get_val(r, 'Hostname'),
-                    ip_address=map_field('ip_address') or get_val(r, 'IP Address'),
-                    owner=map_field('owner'),
-                    department=map_field('department'),
-                    operating_system=map_field('operating_system'),
-                    location=map_field('location'),
-                    environment=map_field('environment'),
-                    business_unit=map_field('business_unit'),
-                    status='active',
+                    hostname=map_field('hostname') or get_val(r, 'Hostname') or get_val(r, 'Name') or get_val(r, 'Host'),
+                    ip_address=map_field('ip_address') or get_val(r, 'IP Address') or get_val(r, 'IP') or get_val(r, 'IPAddress'),
+                    owner=map_field('owner') or get_val(r, 'Owned by') or get_val(r, 'Owner'),
+                    department=map_field('department') or get_val(r, 'Department'),
+                    operating_system=(add.get('operating_system') or map_field('operating_system') or get_val(r, 'Operating System') or get_val(r, 'OS Type') or get_val(r, 'OS')),
+                    location=map_field('location') or get_val(r, 'Location'),
+                    environment=map_field('environment') or get_val(r, 'Environment'),
+                    business_unit=map_field('business_unit') or get_val(r, 'Business Unit'),
+                    status=(map_field('status') or get_val(r, 'CI Status') or get_val(r, 'Status') or 'active'),
                     additional_data=json.dumps(add)
                 )
                 objs.append(asset)
@@ -3477,30 +3587,63 @@ def import_vlans():
                 internal_mapping[field].append(csv_col)
         mapping = internal_mapping
         
-        # Read file content
-        content = file.read()
-        try:
-            text_content = content.decode('utf-8-sig')
-        except UnicodeDecodeError:
-            text_content = content.decode('latin-1')
-        
-        # Filter out comment lines (starting with #)
-        lines = [line for line in text_content.splitlines() if line.strip() and not line.strip().startswith('#')]
-        
-        if not lines:
-             return jsonify({'error': 'File is empty or contains only comments'}), 400
+        filename = file.filename or ''
+        name_lower = filename.lower()
 
-        stream = io.StringIO('\n'.join(lines), newline=None)
-        reader = csv.DictReader(stream)
-        
-        # Normalize headers (strip whitespace)
-        if reader.fieldnames:
-            reader.fieldnames = [h.strip() for h in reader.fieldnames]
+        rows = []
+        headers = []
+        if name_lower.endswith('.xlsx') or name_lower.endswith('.xls'):
+            try:
+                import pandas as pd
+                df = pd.read_excel(file, engine='openpyxl', dtype=str)
+                df = df.fillna('')
+                df.columns = [str(c).strip() for c in df.columns.tolist()]
+                headers = [str(c).strip() for c in df.columns.tolist()]
+                rows = df.astype(str).to_dict(orient='records')
+            except Exception:
+                return jsonify({'error': 'Invalid or unreadable Excel file'}), 400
+        else:
+            content = file.read()
+            try:
+                text_content = content.decode('utf-8-sig')
+            except UnicodeDecodeError:
+                text_content = content.decode('latin-1')
+
+            lines = [line for line in text_content.splitlines() if line.strip() and not line.strip().startswith('#')]
+            if not lines:
+                return jsonify({'error': 'File is empty or contains only comments'}), 400
+
+            stream = io.StringIO('\n'.join(lines), newline=None)
+            reader = csv.DictReader(stream)
+
+            if reader.fieldnames:
+                reader.fieldnames = [h.strip() for h in reader.fieldnames]
+                headers = list(reader.fieldnames)
+            rows = list(reader)
         
         created_count = 0
         errors = []
-        
-        for i, row in enumerate(reader):
+
+        def _get(row_dict, key):
+            if not row_dict or not key:
+                return ''
+            if key in row_dict and row_dict[key] not in [None, '']:
+                return str(row_dict[key]).strip()
+            lk = {str(k).strip().lower(): k for k in row_dict.keys()}
+            k2 = str(key).strip().lower()
+            if k2 in lk:
+                v = row_dict.get(lk[k2])
+                return str(v).strip() if v not in [None, ''] else ''
+            return ''
+
+        def _first(row_dict, keys):
+            for k in keys:
+                v = _get(row_dict, k)
+                if v:
+                    return v
+            return ''
+
+        for i, row in enumerate(rows):
             try:
                 # Map fields
                 vlan_data = {}
@@ -3508,21 +3651,40 @@ def import_vlans():
                     val = None
                     if isinstance(cols, list):
                         for col in cols:
-                            if col in row and row[col]:
-                                val = row[col]
+                            v = _get(row, col)
+                            if v:
+                                val = v
                                 break
                     else:
-                        if cols in row:
-                            val = row[cols]
+                        v = _get(row, cols)
+                        if v:
+                            val = v
                     
                     if val is not None:
-                        vlan_data[field] = val.strip()
+                        vlan_data[field] = str(val).strip()
+
+                if 'vlan_id' not in vlan_data:
+                    vlan_data['vlan_id'] = _first(row, ['VLAN ID', 'Vlan ID', 'VLAN', 'VLAN_ID', 'vlan_id', 'id'])
+                if 'name' not in vlan_data:
+                    vlan_data['name'] = _first(row, ['Name', 'VLAN Name', 'vlan_name'])
+                if 'subnet' not in vlan_data:
+                    vlan_data['subnet'] = _first(row, ['Subnet', 'Subnets', 'Network', 'CIDR', 'network_segment'])
+                if 'gateway' not in vlan_data:
+                    vlan_data['gateway'] = _first(row, ['Gateway', 'Default Gateway', 'GW'])
+                if 'location' not in vlan_data:
+                    vlan_data['location'] = _first(row, ['Location', 'Site', 'Datacenter'])
+                if 'description' not in vlan_data:
+                    vlan_data['description'] = _first(row, ['Description', 'Desc'])
+                if 'status' not in vlan_data:
+                    vlan_data['status'] = _first(row, ['Status', 'State']) or 'active'
+                if 'vlan_type' not in vlan_data:
+                    vlan_data['vlan_type'] = _first(row, ['VLAN Type', 'Type', 'vlan_type']) or 'access'
                 
                 # Create VLAN
                 if 'vlan_id' in vlan_data:
                     # Check if exists
                     try:
-                        vid = int(vlan_data['vlan_id'])
+                        vid = int(str(vlan_data['vlan_id']).strip())
                     except ValueError:
                         continue
                         
@@ -3541,8 +3703,8 @@ def import_vlans():
                             description=vlan_data.get('description', ''),
                             location=vlan_data.get('location', ''),
                             source_file=file.filename,
-                            status='active',
-                            vlan_type='access'
+                            status=vlan_data.get('status', 'active') or 'active',
+                            vlan_type=vlan_data.get('vlan_type', 'access') or 'access'
                         )
                         db.session.add(vlan)
                     created_count += 1

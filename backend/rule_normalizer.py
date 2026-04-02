@@ -563,24 +563,52 @@ class RuleNormalizer:
         try:
             # Check if IP falls within any VLAN network
             vlans = db.session.query(VLANNetwork).all()
-            
+
+            try:
+                ip = ipaddress.ip_address(ip_address)
+            except Exception:
+                return None
+
             for vlan in vlans:
                 try:
                     # Handle multiple subnets separated by space, comma, or newline
                     if not vlan.subnet:
                         continue
                         
-                    subnets = re.split(r'[,\s\n]+', str(vlan.subnet).strip())
-                    ip = ipaddress.ip_address(ip_address)
+                    raw_subnets = str(vlan.subnet).strip()
+                    chunks = [c.strip() for c in re.split(r'[,;\n\|]+', raw_subnets) if c and str(c).strip()]
                     
-                    for subnet_str in subnets:
-                        if not subnet_str:
+                    for chunk in chunks:
+                        if not chunk:
                             continue
+
+                        parts = chunk.split()
+                        if len(parts) == 2:
+                            try:
+                                network = ipaddress.ip_network(f"{parts[0]}/{parts[1]}", strict=False)
+                                if ip in network:
+                                    return vlan
+                                continue
+                            except Exception:
+                                pass
+
+                        if ' ' in chunk and '/' in chunk:
+                            for token in chunk.split():
+                                if '/' not in token:
+                                    continue
+                                try:
+                                    network = ipaddress.ip_network(token, strict=False)
+                                    if ip in network:
+                                        return vlan
+                                except Exception:
+                                    continue
+                            continue
+
                         try:
-                            network = ipaddress.ip_network(subnet_str, strict=False)
+                            network = ipaddress.ip_network(chunk, strict=False)
                             if ip in network:
                                 return vlan
-                        except (ValueError, ipaddress.AddressValueError):
+                        except Exception:
                             continue
                             
                 except Exception:
@@ -1103,8 +1131,8 @@ class RuleNormalizer:
             
             # For enrichment, try to get the first IP if it's a range or object group
             # but keep the original value in the normalized rule
-            source_ip_for_enrichment = self._extract_first_ip_for_enrichment(source_ip)
-            dest_ip_for_enrichment = self._extract_first_ip_for_enrichment(dest_ip)
+            source_ip_for_enrichment = self._extract_first_ip_for_enrichment(source_ip_str)
+            dest_ip_for_enrichment = self._extract_first_ip_for_enrichment(dest_ip_str)
             
             # Enrich source IP data (using first IP for lookup, but keeping original value)
             source_enrichment = self.enrich_ip_data(source_ip_for_enrichment)
