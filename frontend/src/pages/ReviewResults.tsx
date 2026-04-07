@@ -43,8 +43,6 @@ import {
 import {
   ExpandMore as ExpandMoreIcon,
   PlayArrow as PlayArrowIcon,
-  GetApp as GetAppIcon,
-  PictureAsPdf as PictureAsPdfIcon,
   Refresh as RefreshIcon,
   Visibility as VisibilityIcon,
   ArrowForward as ArrowForwardIcon,
@@ -53,6 +51,8 @@ import {
   ArrowDownward as ArrowDownwardIcon,
   Delete as DeleteIcon
 } from '@mui/icons-material';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 interface ReviewSession {
   review_session_id: string;
@@ -198,7 +198,7 @@ const ReviewResults: React.FC = () => {
   const openCreateExportProfile = async () => {
     try {
       setCreateExportProfileOpen(true);
-      const res = await fetch('http://localhost:5001/api/compliance/fields');
+      const res = await fetch(`${API_BASE_URL}/api/compliance/fields`);
       const data = await res.json();
       const fields = (data.fields || []).map((f:any)=>({ name: f.name, description: f.description }));
       setAvailableExportFields(fields);
@@ -231,7 +231,7 @@ const ReviewResults: React.FC = () => {
       body.selected_fields = newExportProfile.selected_fields;
       body.include_sections = newExportProfile.include_sections;
       body.charts = newExportProfile.charts;
-      const res = await fetch('http://localhost:5001/api/export/profiles', {
+      const res = await fetch(`${API_BASE_URL}/api/export/profiles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
@@ -510,121 +510,38 @@ const ReviewResults: React.FC = () => {
     return new Date(dateString).toLocaleString();
   };
 
-  const handleExportExcel = async () => {
-    if (!selectedSession) {
-      alert('Please select a review session first');
-      return;
-    }
-
-    try {
-      const response = await fetch(`http://localhost:5001/api/export/excel/${selectedSession}`);
-      
-      if (!response.ok) {
-        throw new Error('Export failed');
+  const getFilenameFromContentDisposition = (value: string | null, fallback: string) => {
+    if (!value) return fallback;
+    const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match && utf8Match[1]) {
+      try {
+        return decodeURIComponent(utf8Match[1]);
+      } catch {
+        return utf8Match[1];
       }
-
-      // Get the filename from the response headers
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'compliance_report.xlsx';
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-      }
-
-      // Create blob and download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error exporting Excel:', error);
-      alert('Error exporting to Excel');
     }
+    const basicMatch = value.match(/filename="?([^"]+)"?/i);
+    if (basicMatch && basicMatch[1]) return basicMatch[1];
+    return fallback;
   };
 
-  const handleExportCSV = async () => {
-    if (!selectedSession) {
-      alert('Please select a review session first');
-      return;
+  const downloadFromUrl = async (url: string, fallbackFilename: string) => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      const msg = await response.text().catch(() => '');
+      throw new Error(msg || `Export failed (${response.status})`);
     }
-
-    try {
-      const response = await fetch(`http://localhost:5001/api/export/csv/${selectedSession}`);
-      
-      if (!response.ok) {
-        throw new Error('Export failed');
-      }
-
-      // Get the filename from the response headers
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'compliance_report.csv';
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-      }
-
-      // Create blob and download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error exporting CSV:', error);
-      alert('Error exporting to CSV');
-    }
-  };
-
-  const handleExportPDF = async () => {
-    if (!selectedSession) {
-      alert('Please select a review session first');
-      return;
-    }
-
-    try {
-      const response = await fetch(`http://localhost:5001/api/export/pdf/${selectedSession}`);
-      
-      if (!response.ok) {
-        throw new Error('Export failed');
-      }
-
-      // Get the filename from the response headers
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let filename = 'compliance_report.pdf';
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
-        if (filenameMatch) {
-          filename = filenameMatch[1];
-        }
-      }
-
-      // Create blob and download
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      alert('Error exporting to PDF');
-    }
+    const cd = response.headers.get('Content-Disposition') || response.headers.get('content-disposition');
+    const filename = getFilenameFromContentDisposition(cd, fallbackFilename);
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(blobUrl);
+    document.body.removeChild(a);
   };
 
   return (
@@ -1007,7 +924,7 @@ const ReviewResults: React.FC = () => {
                 label="Export Profile (optional)"
                 onOpen={async ()=>{
                   try {
-                    const res = await fetch('http://localhost:5001/api/export/profiles');
+                    const res = await fetch(`${API_BASE_URL}/api/export/profiles`);
                     const data = await res.json();
                     if (data && data.success) {
                       setExportProfiles(data.data || []);
@@ -1050,46 +967,58 @@ const ReviewResults: React.FC = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setExportDialogOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={() => {
+          <Button variant="contained" onClick={async () => {
             const sid = selectedSession;
-            if (!sid) return;
+            if (!sid) {
+              alert('Please select a review session first');
+              return;
+            }
             let url = '';
             const pid = selectedExportProfileId;
-            if (exportFormat === 'pdf') {
-              const qp = new URLSearchParams();
-              if (pid) {
-                if (exportSourceFile) qp.set('source_file', exportSourceFile);
-                qp.set('profile_id', String(pid));
-                url = `http://localhost:5001/api/export/pdf/custom/${sid}?${qp.toString()}`;
+            let fallbackFilename = `review_export_${sid}`;
+            try {
+              if (exportFormat === 'pdf') {
+                fallbackFilename += '.pdf';
+                const qp = new URLSearchParams();
+                if (pid) {
+                  if (exportSourceFile) qp.set('source_file', exportSourceFile);
+                  qp.set('profile_id', String(pid));
+                  url = `${API_BASE_URL}/api/export/pdf/custom/${sid}?${qp.toString()}`;
+                } else {
+                  qp.set('include_compliant', exportIncludeCompliant ? 'true' : 'false');
+                  if (exportGroupBy) qp.set('group_by', exportGroupBy);
+                  if (exportSourceFile) qp.set('source_file', exportSourceFile);
+                  url = `${API_BASE_URL}/api/export/pdf/${sid}?${qp.toString()}`;
+                }
+              } else if (exportFormat === 'excel') {
+                fallbackFilename += '.xlsx';
+                const qp = new URLSearchParams();
+                if (pid) {
+                  if (exportSourceFile) qp.set('source_file', exportSourceFile);
+                  qp.set('profile_id', String(pid));
+                  url = `${API_BASE_URL}/api/export/excel/custom/${sid}?${qp.toString()}`;
+                } else {
+                  qp.set('include_compliant', exportIncludeCompliant ? 'true' : 'false');
+                  url = `${API_BASE_URL}/api/export/excel/${sid}?${qp.toString()}`;
+                }
               } else {
-                if (exportIncludeCompliant) qp.set('include_compliant','true');
-                if (exportGroupBy) qp.set('group_by', exportGroupBy);
-                if (exportSourceFile) qp.set('source_file', exportSourceFile);
-                url = `http://localhost:5001/api/export/pdf/${sid}?${qp.toString()}`;
+                fallbackFilename += '.csv';
+                const qp = new URLSearchParams();
+                if (pid) {
+                  if (exportSourceFile) qp.set('source_file', exportSourceFile);
+                  qp.set('profile_id', String(pid));
+                  url = `${API_BASE_URL}/api/export/csv/custom/${sid}?${qp.toString()}`;
+                } else {
+                  if (exportSourceFile) qp.set('source_file', exportSourceFile);
+                  qp.set('include_compliant', exportIncludeCompliant ? 'true' : 'false');
+                  url = `${API_BASE_URL}/api/export/csv/${sid}?${qp.toString()}`;
+                }
               }
-            } else if (exportFormat === 'excel') {
-              const qp = new URLSearchParams();
-              if (pid) {
-                qp.set('profile_id', String(pid));
-                url = `http://localhost:5001/api/export/excel/custom/${sid}?${qp.toString()}`;
-              } else {
-                if (exportIncludeCompliant) qp.set('include_compliant','true');
-                url = `http://localhost:5001/api/export/excel/${sid}?${qp.toString()}`;
-              }
-            } else {
-              const qp = new URLSearchParams();
-              if (pid) {
-                if (exportSourceFile) qp.set('source_file', exportSourceFile);
-                qp.set('profile_id', String(pid));
-                url = `http://localhost:5001/api/export/csv/custom/${sid}?${qp.toString()}`;
-              } else {
-                if (exportSourceFile) qp.set('source_file', exportSourceFile);
-                if (exportIncludeCompliant) qp.set('include_compliant','true');
-                url = `http://localhost:5001/api/export/csv/${sid}?${qp.toString()}`;
-              }
+              await downloadFromUrl(url, fallbackFilename);
+              setExportDialogOpen(false);
+            } catch (e) {
+              alert(e instanceof Error ? e.message : 'Export failed');
             }
-            window.open(url, '_blank');
-            setExportDialogOpen(false);
           }}>Download</Button>
         </DialogActions>
       </Dialog>

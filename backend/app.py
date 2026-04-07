@@ -1,5 +1,5 @@
 import logging
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response, stream_with_context
 from flask_cors import CORS
 from sqlalchemy import or_, and_, text
 from sqlalchemy.exc import OperationalError
@@ -11,11 +11,11 @@ import uuid
 import os
 from datetime import datetime, timedelta
 
-from models import db, ComplianceRule, ReviewResult, ReviewProfile, NormalizedRule, CMDBAsset, VLANNetwork, RawFirewallRule, ObjectGroup, ServicePortMapping, CustomFieldModel, CustomRuleModel, ProfileRuleLink, ObjectGroupMember
+from models import db, ComplianceRule, ReviewResult, ReviewProfile, NormalizedRule, CMDBAsset, VLANNetwork, RawFirewallRule, ObjectGroup, ServicePortMapping, CustomFieldModel, CustomRuleModel, ProfileRuleLink, ObjectGroupMember, ExportProfile
 from compliance_engine import ComplianceEngine
 from review_engine import run_review_process
 from parsers.parser_factory import parser_factory
-from export_service import generate_excel_export
+from export_service import generate_excel_export, generate_excel_export_custom, generate_csv_export, generate_csv_export_custom, generate_pdf_export, generate_pdf_export_custom, iter_csv_export, iter_csv_export_custom
 from object_group_scanner import scan_for_object_groups
 from iana_import import import_iana_service_mappings
 
@@ -3541,7 +3541,11 @@ def bulk_delete_normalized_rules():
 @app.route('/api/export/excel/<review_session_id>', methods=['GET'])
 def export_review_results(review_session_id):
     try:
-        excel_bytes = generate_excel_export(review_session_id)
+        include = request.args.get('include_compliant')
+        include_compliant = None
+        if include is not None:
+            include_compliant = str(include).lower() not in ('false', '0', 'no')
+        excel_bytes = generate_excel_export(review_session_id, include_compliant=include_compliant)
         return send_file(
             io.BytesIO(excel_bytes),
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -3555,6 +3559,174 @@ def export_review_results(review_session_id):
              return jsonify({'error': str(e)}), 404
         logger.error(f"Export failed: {e}")
         return jsonify({'error': 'Export failed'}), 500
+
+
+@app.route('/api/export/excel/custom/<review_session_id>', methods=['GET'])
+def export_review_results_excel_custom(review_session_id):
+    try:
+        profile_id = request.args.get('profile_id', type=int)
+        if not profile_id:
+            return jsonify({'error': 'profile_id is required'}), 400
+        profile = db.session.get(ExportProfile, profile_id)
+        if not profile:
+            return jsonify({'error': 'Export profile not found'}), 404
+        options = profile.to_dict()
+        source_file = request.args.get('source_file')
+        if source_file:
+            options['source_file'] = source_file
+        excel_bytes = generate_excel_export_custom(review_session_id, options)
+        return send_file(
+            io.BytesIO(excel_bytes),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            as_attachment=True,
+            download_name=f'review_export_{review_session_id}.xlsx'
+        )
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        logger.error(f"Custom Excel export failed: {e}")
+        return jsonify({'error': 'Export failed'}), 500
+
+
+@app.route('/api/export/csv/<review_session_id>', methods=['GET'])
+def export_review_results_csv(review_session_id):
+    try:
+        source_file = request.args.get('source_file')
+        include = request.args.get('include_compliant')
+        include_compliant = None
+        if include is not None:
+            include_compliant = str(include).lower() not in ('false', '0', 'no')
+        resp = Response(
+            stream_with_context(iter_csv_export(review_session_id, source_file=source_file, include_compliant=include_compliant)),
+            mimetype='text/csv'
+        )
+        resp.headers['Content-Disposition'] = f'attachment; filename=review_export_{review_session_id}.csv'
+        return resp
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        logger.error(f"CSV export failed: {e}")
+        return jsonify({'error': 'Export failed'}), 500
+
+
+@app.route('/api/export/csv/custom/<review_session_id>', methods=['GET'])
+def export_review_results_csv_custom(review_session_id):
+    try:
+        profile_id = request.args.get('profile_id', type=int)
+        if not profile_id:
+            return jsonify({'error': 'profile_id is required'}), 400
+        profile = db.session.get(ExportProfile, profile_id)
+        if not profile:
+            return jsonify({'error': 'Export profile not found'}), 404
+        options = profile.to_dict()
+        source_file = request.args.get('source_file')
+        if source_file:
+            options['source_file'] = source_file
+        resp = Response(
+            stream_with_context(iter_csv_export_custom(review_session_id, options)),
+            mimetype='text/csv'
+        )
+        resp.headers['Content-Disposition'] = f'attachment; filename=review_export_{review_session_id}.csv'
+        return resp
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        logger.error(f"Custom CSV export failed: {e}")
+        return jsonify({'error': 'Export failed'}), 500
+
+
+@app.route('/api/export/pdf/<review_session_id>', methods=['GET'])
+def export_review_results_pdf(review_session_id):
+    try:
+        source_file = request.args.get('source_file')
+        group_by = request.args.get('group_by')
+        include = request.args.get('include_compliant')
+        include_compliant = None
+        if include is not None:
+            include_compliant = str(include).lower() not in ('false', '0', 'no')
+        pdf_bytes = generate_pdf_export(review_session_id, source_file=source_file, include_compliant=include_compliant, group_by=group_by)
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'review_export_{review_session_id}.pdf'
+        )
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        logger.error(f"PDF export failed: {e}")
+        return jsonify({'error': 'Export failed'}), 500
+
+
+@app.route('/api/export/pdf/custom/<review_session_id>', methods=['GET'])
+def export_review_results_pdf_custom(review_session_id):
+    try:
+        profile_id = request.args.get('profile_id', type=int)
+        if not profile_id:
+            return jsonify({'error': 'profile_id is required'}), 400
+        profile = db.session.get(ExportProfile, profile_id)
+        if not profile:
+            return jsonify({'error': 'Export profile not found'}), 404
+        options = profile.to_dict()
+        source_file = request.args.get('source_file')
+        if source_file:
+            options['source_file'] = source_file
+        pdf_bytes = generate_pdf_export_custom(review_session_id, options)
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f'review_export_{review_session_id}.pdf'
+        )
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        logger.error(f"Custom PDF export failed: {e}")
+        return jsonify({'error': 'Export failed'}), 500
+
+
+@app.route('/api/export/profiles', methods=['GET', 'POST'])
+def export_profiles():
+    try:
+        if request.method == 'GET':
+            profiles = db.session.query(ExportProfile).order_by(ExportProfile.created_at.desc()).all()
+            return jsonify({'success': True, 'data': [p.to_dict() for p in profiles]})
+
+        payload = request.get_json() or {}
+        profile_name = (payload.get('profile_name') or '').strip()
+        if not profile_name:
+            return jsonify({'success': False, 'error': 'profile_name is required'}), 400
+        fmt = (payload.get('format') or 'pdf').strip().lower()
+        if fmt not in ('pdf', 'excel', 'csv'):
+            return jsonify({'success': False, 'error': 'Invalid format'}), 400
+        include_compliant = bool(payload.get('include_compliant', True))
+        group_by = (payload.get('group_by') or '').strip() or None
+        selected_fields = payload.get('selected_fields') or []
+        include_sections = payload.get('include_sections') or []
+        charts = payload.get('charts') or {}
+        filters = payload.get('filters') or {}
+        tiles = payload.get('tiles') or {}
+
+        prof = ExportProfile(
+            profile_name=profile_name,
+            description=payload.get('description'),
+            format=fmt,
+            include_compliant=include_compliant,
+            group_by=group_by,
+            selected_fields=json.dumps(selected_fields),
+            include_sections=json.dumps(include_sections),
+            charts=json.dumps(charts),
+            filters=json.dumps(filters),
+            tiles=json.dumps(tiles),
+            created_by=payload.get('created_by') or 'ui'
+        )
+        db.session.add(prof)
+        db.session.commit()
+        return jsonify({'success': True, 'data': prof.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Export profiles error: {e}")
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
 
 
 @app.route('/api/vlans/import', methods=['POST'])
